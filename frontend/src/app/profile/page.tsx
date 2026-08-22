@@ -4,7 +4,6 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { User, Brain, TrendingUp, ClipboardCheck, Loader2, Gamepad2, Calendar, ArrowUp, ArrowDown } from "lucide-react";
-import { seedUsers } from "@/lib/seed";
 import { GAMES } from "@/lib/games-data";
 
 export default function ProfilePage() {
@@ -14,6 +13,7 @@ export default function ProfilePage() {
   const [testResults, setTestResults] = useState<any[]>([]);
   const [gameSessions, setGameSessions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const roleLabels: Record<string, string> = {
     admin: "Администратор",
@@ -23,33 +23,51 @@ export default function ProfilePage() {
   };
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
-    if (!token) {
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        setLoading(false);
+        return;
+      }
+      const users = JSON.parse(localStorage.getItem("users") || "[]");
+      const found = users.find((u: any) => u.id === token);
+      if (found) {
+        setUser(found);
+        localStorage.setItem("currentUser", JSON.stringify(found));
+      }
+
+      // Загружаем историю тестов
+      const results = JSON.parse(localStorage.getItem("testResults_" + token) || "[]");
+      setTestResults(results);
+
+      // Загружаем игровые сессии — фильтруем только правильные
+      const sessions = JSON.parse(localStorage.getItem("gameSessions_" + token) || "[]");
+      // Фильтруем сессии: оставляем только те, у кого есть поля noGames или games (формат с теста)
+      // или те, у кого есть status (формат с профиля помощника)
+      setGameSessions(sessions);
+
       setLoading(false);
-      return;
+    } catch (err) {
+      console.error("Profile load error:", err);
+      setError("Ошибка загрузки профиля. Попробуйте очистить кэш.");
+      setLoading(false);
     }
-    const users = JSON.parse(localStorage.getItem("users") || "[]");
-    const found = users.find((u: any) => u.id === token);
-    if (found) {
-      setUser(found);
-      localStorage.setItem("currentUser", JSON.stringify(found));
-    }
-
-    // Загружаем историю тестов
-    const results = JSON.parse(localStorage.getItem("testResults_" + token) || "[]");
-    setTestResults(results);
-
-    // Загружаем игровые сессии
-    const sessions = JSON.parse(localStorage.getItem("gameSessions_" + token) || "[]");
-    setGameSessions(sessions);
-
-    setLoading(false);
   }, []);
 
   if (loading) {
     return (
       <div className="container mx-auto px-4 py-12 text-center">
         <Loader2 className="h-8 w-8 animate-spin mx-auto text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="container mx-auto px-4 py-12 text-center">
+        <h2 className="text-xl font-semibold text-destructive mb-2">Ошибка</h2>
+        <p className="text-muted-foreground mb-4">{error}</p>
+        <Button onClick={() => window.location.reload()}>Перезагрузить</Button>
       </div>
     );
   }
@@ -71,8 +89,8 @@ export default function ProfilePage() {
   // Считаем дельту
   const getDelta = (key: string) => {
     if (!lastResult || !prevResult) return null;
-    const last = lastResult.dimensions[key]?.score || 0;
-    const prev = prevResult.dimensions[key]?.score || 0;
+    const last = lastResult.dimensions?.[key]?.score || 0;
+    const prev = prevResult.dimensions?.[key]?.score || 0;
     return last - prev;
   };
 
@@ -82,15 +100,24 @@ export default function ProfilePage() {
   };
 
   const formatDate = (d: string) => {
-    return new Date(d).toLocaleDateString("ru-RU", {
-      day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit"
-    });
+    if (!d) return "";
+    try {
+      return new Date(d).toLocaleDateString("ru-RU", {
+        day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit"
+      });
+    } catch {
+      return d;
+    }
   };
 
   const getGameTitle = (id: number) => {
     const game = GAMES.find(g => g.id === id);
     return game?.title || "Неизвестная игра";
   };
+
+  // Определяем тип сессии
+  const isTestSession = (s: any) => s && (s.noGames !== undefined || (s.games && typeof s.games === 'object'));
+  const isHelperSession = (s: any) => s && s.helperId !== undefined;
 
   return (
     <div className="container mx-auto px-4 py-12">
@@ -131,8 +158,8 @@ export default function ProfilePage() {
               <h2 className="text-xl font-semibold">Последний результат</h2>
             </div>
             <div className="text-center p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg mb-4">
-              <p className="text-3xl font-bold text-purple-600 dark:text-purple-400">{lastResult.mbtiType}</p>
-              <p className="text-lg mt-1">{lastResult.description.title}</p>
+              <p className="text-3xl font-bold text-purple-600 dark:text-purple-400">{lastResult.mbtiType || "—"}</p>
+              <p className="text-lg mt-1">{lastResult.description?.title || ""}</p>
               <p className="text-sm text-muted-foreground mt-1">
                 Средний балл: <strong>{lastResult.average}/7</strong>
                 {getAverageDelta() !== null && (
@@ -145,7 +172,7 @@ export default function ProfilePage() {
             </div>
 
             {/* Дельта по шкалам */}
-            {prevResult && (
+            {prevResult && lastResult.dimensions && (
               <div className="space-y-2 mb-4">
                 <p className="text-sm font-medium text-muted-foreground">Изменения с предыдущего теста:</p>
                 {["EI", "SN", "TF", "JP"].map(key => {
@@ -170,33 +197,35 @@ export default function ProfilePage() {
               </div>
             )}
 
-            <div className="grid grid-cols-2 gap-4">
-              {["EI", "SN", "TF", "JP"].map(key => {
-                const dim = lastResult.dimensions[key];
-                if (!dim) return null;
-                let first = 0, second = 0, firstLabel = "", secondLabel = "";
-                if (dim.E !== undefined) { first = dim.E; second = dim.I || 0; firstLabel = "E"; secondLabel = "I"; }
-                else if (dim.S !== undefined) { first = dim.S; second = dim.N || 0; firstLabel = "S"; secondLabel = "N"; }
-                else if (dim.T !== undefined) { first = dim.T; second = dim.F || 0; firstLabel = "T"; secondLabel = "F"; }
-                else { first = dim.J || 0; second = dim.P || 0; firstLabel = "J"; secondLabel = "P"; }
-                const scaleNames: Record<string, string> = {
-                  EI: "Экстраверсия — Интроверсия",
-                  SN: "Интуиция — Сенсорика",
-                  TF: "Мышление — Чувство",
-                  JP: "Суждение — Восприятие",
-                };
-                return (
-                  <div key={key} className="p-4 rounded-xl border bg-card">
-                    <div className="text-xs text-muted-foreground mb-1">{scaleNames[key]}</div>
-                    <div className="text-lg font-bold mb-2">{dim.value}: {dim.score}%</div>
-                    <div className="flex justify-between text-sm">
-                      <span>{firstLabel}: {first}%</span>
-                      <span>{secondLabel}: {second}%</span>
+            {lastResult.dimensions && (
+              <div className="grid grid-cols-2 gap-4">
+                {["EI", "SN", "TF", "JP"].map(key => {
+                  const dim = lastResult.dimensions[key];
+                  if (!dim) return null;
+                  let first = 0, second = 0, firstLabel = "", secondLabel = "";
+                  if (dim.E !== undefined) { first = dim.E; second = dim.I || 0; firstLabel = "E"; secondLabel = "I"; }
+                  else if (dim.S !== undefined) { first = dim.S; second = dim.N || 0; firstLabel = "S"; secondLabel = "N"; }
+                  else if (dim.T !== undefined) { first = dim.T; second = dim.F || 0; firstLabel = "T"; secondLabel = "F"; }
+                  else { first = dim.J || 0; second = dim.P || 0; firstLabel = "J"; secondLabel = "P"; }
+                  const scaleNames: Record<string, string> = {
+                    EI: "Экстраверсия — Интроверсия",
+                    SN: "Интуиция — Сенсорика",
+                    TF: "Мышление — Чувство",
+                    JP: "Суждение — Восприятие",
+                  };
+                  return (
+                    <div key={key} className="p-4 rounded-xl border bg-card">
+                      <div className="text-xs text-muted-foreground mb-1">{scaleNames[key]}</div>
+                      <div className="text-lg font-bold mb-2">{dim.value}: {dim.score}%</div>
+                      <div className="flex justify-between text-sm">
+                        <span>{firstLabel}: {first}%</span>
+                        <span>{secondLabel}: {second}%</span>
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+            )}
 
             <div className="mt-4">
               <Button variant="outline" size="sm" onClick={() => router.push("/test")}>Пройти заново</Button>
@@ -217,7 +246,7 @@ export default function ProfilePage() {
                   <div className="flex items-center gap-3">
                     <Calendar className="h-4 w-4 text-muted-foreground" />
                     <div>
-                      <p className="font-medium">{r.mbtiType} — {r.description.title}</p>
+                      <p className="font-medium">{r.mbtiType || "—"} — {r.description?.title || ""}</p>
                       <p className="text-xs text-muted-foreground">{formatDate(r.date)}</p>
                     </div>
                   </div>
@@ -242,20 +271,46 @@ export default function ProfilePage() {
               {[...gameSessions].reverse().map((s, i) => (
                 <div key={i} className="p-3 rounded-lg border">
                   <p className="text-xs text-muted-foreground mb-2">{formatDate(s.date)}</p>
-                  {s.noGames ? (
-                    <p className="text-sm text-muted-foreground">Не играл в игры</p>
-                  ) : (
+                  
+                  {/* Сессия с теста (формат: noGames / games) */}
+                  {isTestSession(s) && (
+                    s.noGames ? (
+                      <p className="text-sm text-muted-foreground">Не играл в игры</p>
+                    ) : s.games ? (
+                      <div className="space-y-1">
+                        {Object.entries(s.games).map(([gameId, data]: [string, any]) => (
+                          <div key={gameId} className="flex items-center justify-between text-sm">
+                            <span>{getGameTitle(parseInt(gameId))}</span>
+                            <span className="text-muted-foreground">
+                              {data.times} раз(а)
+                              {data.helper ? ` | Наставник: Алексей Наставников` : ""}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : null
+                  )}
+                  
+                  {/* Сессия с помощника (формат: playerId, helperId, gameId) */}
+                  {isHelperSession(s) && (
                     <div className="space-y-1">
-                      {Object.entries(s.games).map(([gameId, data]: [string, any]) => (
-                        <div key={gameId} className="flex items-center justify-between text-sm">
-                          <span>{getGameTitle(parseInt(gameId))}</span>
-                          <span className="text-muted-foreground">
-                            {data.times} раз(а)
-                            {data.helper ? ` | Наставник: Алексей Наставников` : ""}
-                          </span>
-                        </div>
-                      ))}
+                      <div className="flex items-center justify-between text-sm">
+                        <span>
+                          {s.gameId ? getGameTitle(s.gameId) : "Без игры"}
+                        </span>
+                        <span className="text-muted-foreground">
+                          Статус: {s.status === "completed" ? "Завершена" : "Ожидает"}
+                        </span>
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        Сессия с наставником
+                      </div>
                     </div>
+                  )}
+
+                  {/* Неизвестный формат */}
+                  {!isTestSession(s) && !isHelperSession(s) && (
+                    <p className="text-sm text-muted-foreground">Сессия (данные недоступны)</p>
                   )}
                 </div>
               ))}
