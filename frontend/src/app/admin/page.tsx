@@ -3,9 +3,9 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Shield, Users as UsersIcon, BookOpen, Swords, CheckCircle, XCircle, Loader2, Plus, Trash2, Edit3, Save } from "lucide-react";
+import { Shield, Users as UsersIcon, BookOpen, Swords, CheckCircle, XCircle, Loader2, Plus, Trash2, Edit3, Save, StickyNote, User } from "lucide-react";
 
-type Tab = "helpers" | "users" | "competencies" | "games";
+type Tab = "helpers" | "players" | "competencies" | "games" | "notes";
 
 interface Competency {
   id: number;
@@ -18,6 +18,14 @@ interface AdminGame {
   description: string;
   complexity: string;
   competencies: { name: string; score: number }[];
+}
+
+interface AdminNote {
+  id: string;
+  text: string;
+  authorId: string;
+  authorName: string;
+  createdAt: string;
 }
 
 function getCompetencies(): Competency[] {
@@ -36,12 +44,21 @@ function saveAdminGames(list: AdminGame[]) {
   localStorage.setItem("adminGames", JSON.stringify(list));
 }
 
+function getAdminNotes(): AdminNote[] {
+  return JSON.parse(localStorage.getItem("adminNotes") || "[]");
+}
+
+function saveAdminNotes(list: AdminNote[]) {
+  localStorage.setItem("adminNotes", JSON.stringify(list));
+}
+
 export default function AdminPage() {
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [tab, setTab] = useState<Tab>("helpers");
   const [userList, setUserList] = useState<any[]>([]);
   const [competencies, setCompetencies] = useState<Competency[]>([]);
   const [games, setGames] = useState<AdminGame[]>([]);
+  const [notes, setNotes] = useState<AdminNote[]>([]);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
@@ -52,6 +69,7 @@ export default function AdminPage() {
   const [gameForm, setGameForm] = useState<AdminGame>({
     id: 0, title: "", description: "", complexity: "Средняя", competencies: []
   });
+  const [noteText, setNoteText] = useState("");
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -101,6 +119,7 @@ export default function AdminPage() {
       saveAdminGames(adminGames);
     }
     setGames(adminGames);
+    setNotes(getAdminNotes());
 
     setLoading(false);
   }, [router]);
@@ -128,17 +147,30 @@ export default function AdminPage() {
   const addCompetency = () => {
     if (!newCompName.trim()) return;
     const comps = getCompetencies();
-    const newComp = { id: Date.now(), name: newCompName.trim() };
-    comps.push(newComp);
+    comps.push({ id: Date.now(), name: newCompName.trim() });
     saveCompetencies(comps);
     setCompetencies(comps);
     setNewCompName("");
   };
 
   const deleteCompetency = (id: number) => {
-    const comps = getCompetencies().filter(c => c.id !== id);
+    saveCompetencies(getCompetencies().filter(c => c.id !== id));
+    setCompetencies(getCompetencies());
+  };
+
+  const saveCompName = (comp: Competency, newName: string) => {
+    const comps = getCompetencies().map(c => c.id === comp.id ? { ...c, name: newName } : c);
     saveCompetencies(comps);
     setCompetencies(comps);
+    // Обновляем название во всех играх
+    let adminGames = getAdminGames();
+    adminGames = adminGames.map(game => ({
+      ...game,
+      competencies: game.competencies.map(c => c.name === comp.name ? { ...c, name: newName } : c)
+    }));
+    saveAdminGames(adminGames);
+    setGames(adminGames);
+    setEditingComp(null);
   };
 
   const startNewGame = () => {
@@ -169,33 +201,46 @@ export default function AdminPage() {
   };
 
   const deleteGame = (id: number) => {
-    let adminGames = getAdminGames().filter(g => g.id !== id);
-    saveAdminGames(adminGames);
-    setGames(adminGames);
+    saveAdminGames(getAdminGames().filter(g => g.id !== id));
+    setGames(getAdminGames());
   };
 
   const toggleGameComp = (compName: string) => {
     const exists = gameForm.competencies.find(c => c.name === compName);
     if (exists) {
-      setGameForm(prev => ({
-        ...prev,
-        competencies: prev.competencies.filter(c => c.name !== compName)
-      }));
+      setGameForm(prev => ({ ...prev, competencies: prev.competencies.filter(c => c.name !== compName) }));
     } else {
-      setGameForm(prev => ({
-        ...prev,
-        competencies: [...prev.competencies, { name: compName, score: 5 }]
-      }));
+      setGameForm(prev => ({ ...prev, competencies: [...prev.competencies, { name: compName, score: 5 }] }));
     }
   };
 
   const updateGameCompScore = (compName: string, score: number) => {
     setGameForm(prev => ({
       ...prev,
-      competencies: prev.competencies.map(c =>
-        c.name === compName ? { ...c, score: Math.max(1, Math.min(10, score)) } : c
-      )
+      competencies: prev.competencies.map(c => c.name === compName ? { ...c, score: Math.max(1, Math.min(10, score)) } : c)
     }));
+  };
+
+  // Заметки
+  const addNote = () => {
+    if (!noteText.trim() || !currentUser) return;
+    const newNote: AdminNote = {
+      id: Date.now().toString(),
+      text: noteText.trim(),
+      authorId: currentUser.id,
+      authorName: currentUser.name,
+      createdAt: new Date().toISOString(),
+    };
+    const allNotes = getAdminNotes();
+    allNotes.push(newNote);
+    saveAdminNotes(allNotes);
+    setNotes(allNotes);
+    setNoteText("");
+  };
+
+  const deleteNote = (id: string) => {
+    saveAdminNotes(getAdminNotes().filter(n => n.id !== id));
+    setNotes(getAdminNotes());
   };
 
   const roleLabels: Record<string, string> = {
@@ -217,10 +262,20 @@ export default function AdminPage() {
 
   const tabs: { key: Tab; label: string; icon: any }[] = [
     { key: "helpers", label: "Помощники", icon: UsersIcon },
-    { key: "users", label: "Пользователи", icon: UsersIcon },
+    { key: "players", label: "Игроки", icon: User },
     { key: "competencies", label: "Компетенции", icon: BookOpen },
     { key: "games", label: "Игры", icon: Swords },
+    { key: "notes", label: "Заметки", icon: StickyNote },
   ];
+
+  const helpers = userList.filter((u: any) => u.role === "helper");
+  const players = userList.filter((u: any) => u.role === "player");
+
+  const formatDate = (d: string) => {
+    return new Date(d).toLocaleDateString("ru-RU", {
+      day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit"
+    });
+  };
 
   return (
     <div className="container mx-auto px-4 py-12">
@@ -247,133 +302,129 @@ export default function AdminPage() {
 
         {tab === "helpers" && (
           <div className="space-y-6">
-            {/* Заявки на рассмотрение */}
             <div>
               <h2 className="text-xl font-semibold mb-4 text-yellow-600 dark:text-yellow-400">
                 Заявки на рассмотрение
               </h2>
-              {userList.filter((u: any) => u.role === "helper" && !u.is_verified).length === 0 ? (
+              {helpers.filter((u: any) => !u.is_verified).length === 0 ? (
                 <p className="text-muted-foreground">Нет новых заявок</p>
               ) : (
                 <div className="space-y-3">
-                  {userList
-                    .filter((u: any) => u.role === "helper" && !u.is_verified)
-                    .map((u: any) => (
-                      <div key={u.id} className="p-4 rounded-xl border-2 border-yellow-200 dark:border-yellow-800 bg-card flex items-center justify-between">
-                        <div>
-                          <p className="font-medium">{u.name}</p>
-                          <p className="text-sm text-muted-foreground">{u.email}</p>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            Зарегистрирован: {new Date(u.created_at).toLocaleDateString("ru-RU")}
-                          </p>
-                        </div>
-                        <div className="flex gap-2">
-                          <Button size="sm" variant="outline" onClick={() => toggleVerify(u.id)}>
-                            <CheckCircle className="h-4 w-4 mr-1 text-green-500" />
-                            Одобрить
-                          </Button>
-                          <Button size="sm" variant="outline" onClick={() => changeRole(u.id, "player")}>
-                            <XCircle className="h-4 w-4 mr-1 text-red-500" />
-                            Отклонить
-                          </Button>
-                        </div>
+                  {helpers.filter((u: any) => !u.is_verified).map((u: any) => (
+                    <div key={u.id} className="p-4 rounded-xl border-2 border-yellow-200 dark:border-yellow-800 bg-card flex items-center justify-between">
+                      <div>
+                        <p className="font-medium">{u.name}</p>
+                        <p className="text-sm text-muted-foreground">{u.email}</p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Зарегистрирован: {formatDate(u.created_at)}
+                        </p>
                       </div>
-                    ))}
+                      <div className="flex gap-2">
+                        <Button size="sm" variant="outline" onClick={() => toggleVerify(u.id)}>
+                          <CheckCircle className="h-4 w-4 mr-1 text-green-500" />
+                          Одобрить
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => changeRole(u.id, "player")}>
+                          <XCircle className="h-4 w-4 mr-1 text-red-500" />
+                          Отклонить
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
 
-            {/* Все помощники */}
             <div>
               <h2 className="text-xl font-semibold mb-4">Все помощники</h2>
-              {userList.filter((u: any) => u.role === "helper").length === 0 ? (
+              {helpers.length === 0 ? (
                 <p className="text-muted-foreground">Нет помощников</p>
               ) : (
                 <div className="space-y-3">
-                  {userList
-                    .filter((u: any) => u.role === "helper")
-                    .map((u: any) => (
-                      <div key={u.id} className="p-4 rounded-xl border bg-card flex items-center justify-between">
-                        <div>
-                          <p className="font-medium">{u.name}</p>
-                          <p className="text-sm text-muted-foreground">{u.email}</p>
-                          <div className="flex gap-2 mt-1">
-                            <span className={"text-xs px-2 py-0.5 rounded-full " + (u.is_verified
-                              ? "bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300"
-                              : "bg-yellow-100 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-300")}>
-                              {u.is_verified ? "Одобрен" : "На проверке"}
+                  {helpers.map((u: any) => (
+                    <div key={u.id} className="p-4 rounded-xl border bg-card flex items-center justify-between">
+                      <div>
+                        <p className="font-medium">{u.name}</p>
+                        <p className="text-sm text-muted-foreground">{u.email}</p>
+                        <div className="flex gap-2 mt-1">
+                          <span className={"text-xs px-2 py-0.5 rounded-full " + (u.is_verified
+                            ? "bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300"
+                            : "bg-yellow-100 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-300")}>
+                            {u.is_verified ? "Одобрен" : "На проверке"}
+                          </span>
+                          {u.mbti_type && (
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300">
+                              {u.mbti_type}
                             </span>
-                            {u.mbti_type && (
-                              <span className="text-xs px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300">
-                                {u.mbti_type}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                        <div className="flex gap-2">
-                          {!u.is_verified && (
-                            <Button size="sm" variant="outline" onClick={() => toggleVerify(u.id)}>
-                              <CheckCircle className="h-4 w-4 mr-1 text-green-500" />
-                              Одобрить
-                            </Button>
                           )}
-                          <select
-                            value={u.role}
-                            onChange={(e) => changeRole(u.id, e.target.value)}
-                            className="text-sm px-2 py-1 rounded border bg-background"
-                          >
-                            <option value="helper">Помощник</option>
-                            <option value="player">Игрок</option>
-                            <option value="leader">Лидер</option>
-                            <option value="admin">Админ</option>
-                          </select>
                         </div>
                       </div>
-                    ))}
+                      <div className="flex gap-2">
+                        {!u.is_verified && (
+                          <Button size="sm" variant="outline" onClick={() => toggleVerify(u.id)}>
+                            <CheckCircle className="h-4 w-4 mr-1 text-green-500" />
+                            Одобрить
+                          </Button>
+                        )}
+                        <select
+                          value={u.role}
+                          onChange={(e) => changeRole(u.id, e.target.value)}
+                          className="text-sm px-2 py-1 rounded border bg-background"
+                        >
+                          <option value="helper">Помощник</option>
+                          <option value="player">Игрок</option>
+                          <option value="leader">Лидер</option>
+                          <option value="admin">Админ</option>
+                        </select>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
           </div>
         )}
 
-        {tab === "users" && (
+        {tab === "players" && (
           <div className="space-y-4">
-            <h2 className="text-xl font-semibold mb-4">Все пользователи</h2>
-            {userList.map((u: any) => (
-              <div key={u.id} className="p-4 rounded-xl border bg-card flex items-center justify-between">
-                <div>
-                  <p className="font-medium">{u.name}</p>
-                  <p className="text-sm text-muted-foreground">{u.email}</p>
-                  <div className="flex gap-2 mt-1">
-                    <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary">
-                      {roleLabels[u.role] || u.role}
-                    </span>
-                    {u.mbti_type && (
-                      <span className="text-xs px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300">
-                        {u.mbti_type}
-                      </span>
-                    )}
+            <h2 className="text-xl font-semibold mb-4">Игроки</h2>
+            {players.length === 0 ? (
+              <p className="text-muted-foreground">Нет игроков</p>
+            ) : (
+              <div className="space-y-3">
+                {players.map((u: any) => (
+                  <div key={u.id} className="p-4 rounded-xl border bg-card flex items-center justify-between">
+                    <div>
+                      <p className="font-medium">{u.name}</p>
+                      <p className="text-sm text-muted-foreground">{u.email}</p>
+                      <div className="flex gap-2 mt-1">
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary">
+                          Игрок
+                        </span>
+                        {u.mbti_type && (
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300">
+                            {u.mbti_type}
+                          </span>
+                        )}
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
+                          {formatDate(u.created_at)}
+                        </span>
+                      </div>
+                    </div>
+                    <select
+                      value={u.role}
+                      onChange={(e) => changeRole(u.id, e.target.value)}
+                      className="text-sm px-2 py-1 rounded border bg-background"
+                    >
+                      <option value="player">Игрок</option>
+                      <option value="helper">Помощник</option>
+                      <option value="leader">Лидер</option>
+                      <option value="admin">Админ</option>
+                    </select>
                   </div>
-                </div>
-                <div className="flex gap-2">
-                  <select
-                    value={u.role}
-                    onChange={(e) => changeRole(u.id, e.target.value)}
-                    className="text-sm px-2 py-1 rounded border bg-background"
-                  >
-                    <option value="player">Игрок</option>
-                    <option value="helper">Помощник</option>
-                    <option value="leader">Лидер</option>
-                    <option value="admin">Админ</option>
-                  </select>
-                  {u.role === "helper" && (
-                    <Button size="sm" variant="outline" onClick={() => toggleVerify(u.id)}>
-                      {u.is_verified ? "Заблокировать" : "Одобрить"}
-                    </Button>
-                  )}
-                </div>
+                ))}
               </div>
-            ))}
+            )}
           </div>
         )}
 
@@ -406,56 +457,15 @@ export default function AdminPage() {
                         onChange={(e) => setEditingComp({ ...editingComp, name: e.target.value })}
                         className="flex-1 px-2 py-1 rounded border bg-background text-sm"
                         onKeyDown={(e) => {
-                          if (e.key === "Enter") {
-                            // Сохраняем новое название
-                            const comps = getCompetencies().map(c =>
-                              c.id === editingComp.id ? { ...c, name: editingComp.name } : c
-                            );
-                            saveCompetencies(comps);
-                            setCompetencies(comps);
-                            // Обновляем название во всех играх
-                            let adminGames = getAdminGames();
-                            adminGames = adminGames.map(game => ({
-                              ...game,
-                              competencies: game.competencies.map(c =>
-                                c.name === comp.name ? { ...c, name: editingComp.name } : c
-                              )
-                            }));
-                            saveAdminGames(adminGames);
-                            setGames(adminGames);
-                            setEditingComp(null);
-                          }
+                          if (e.key === "Enter") saveCompName(comp, editingComp.name);
                           if (e.key === "Escape") setEditingComp(null);
                         }}
                         autoFocus
                       />
-                      <button
-                        onClick={() => {
-                          const comps = getCompetencies().map(c =>
-                            c.id === editingComp.id ? { ...c, name: editingComp.name } : c
-                          );
-                          saveCompetencies(comps);
-                          setCompetencies(comps);
-                          // Обновляем название во всех играх
-                          let adminGames = getAdminGames();
-                          adminGames = adminGames.map(game => ({
-                            ...game,
-                            competencies: game.competencies.map(c =>
-                              c.name === comp.name ? { ...c, name: editingComp.name } : c
-                            )
-                          }));
-                          saveAdminGames(adminGames);
-                          setGames(adminGames);
-                          setEditingComp(null);
-                        }}
-                        className="text-green-500 hover:text-green-600"
-                      >
+                      <button onClick={() => saveCompName(comp, editingComp.name)} className="text-green-500 hover:text-green-600">
                         <Save className="h-4 w-4" />
                       </button>
-                      <button
-                        onClick={() => setEditingComp(null)}
-                        className="text-muted-foreground hover:text-destructive"
-                      >
+                      <button onClick={() => setEditingComp(null)} className="text-muted-foreground hover:text-destructive">
                         <XCircle className="h-4 w-4" />
                       </button>
                     </div>
@@ -463,16 +473,10 @@ export default function AdminPage() {
                     <>
                       <span className="text-sm font-medium">{comp.name}</span>
                       <div className="flex gap-1">
-                        <button
-                          onClick={() => setEditingComp({ id: comp.id, name: comp.name })}
-                          className="text-muted-foreground hover:text-primary transition-colors"
-                        >
+                        <button onClick={() => setEditingComp({ id: comp.id, name: comp.name })} className="text-muted-foreground hover:text-primary transition-colors">
                           <Edit3 className="h-4 w-4" />
                         </button>
-                        <button
-                          onClick={() => deleteCompetency(comp.id)}
-                          className="text-muted-foreground hover:text-destructive transition-colors"
-                        >
+                        <button onClick={() => deleteCompetency(comp.id)} className="text-muted-foreground hover:text-destructive transition-colors">
                           <Trash2 className="h-4 w-4" />
                         </button>
                       </div>
@@ -488,52 +492,28 @@ export default function AdminPage() {
           <div className="space-y-4">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-semibold">Управление играми</h2>
-              <Button onClick={startNewGame}>
-                <Plus className="h-4 w-4 mr-1" /> Новая игра
-              </Button>
+              <Button onClick={startNewGame}><Plus className="h-4 w-4 mr-1" /> Новая игра</Button>
             </div>
 
             {showGameForm && (
               <div className="p-6 rounded-xl border bg-card space-y-4">
-                <h3 className="font-semibold text-lg">
-                  {editingGame ? "Редактировать игру" : "Новая игра"}
-                </h3>
-
+                <h3 className="font-semibold text-lg">{editingGame ? "Редактировать игру" : "Новая игра"}</h3>
                 <div>
                   <label className="block text-sm font-medium mb-1">Название</label>
-                  <input
-                    type="text"
-                    value={gameForm.title}
-                    onChange={(e) => setGameForm(prev => ({ ...prev, title: e.target.value }))}
-                    className="w-full px-3 py-2 rounded-lg border bg-background"
-                    placeholder="Название игры"
-                  />
+                  <input type="text" value={gameForm.title} onChange={(e) => setGameForm(prev => ({ ...prev, title: e.target.value }))} className="w-full px-3 py-2 rounded-lg border bg-background" placeholder="Название игры" />
                 </div>
-
                 <div>
                   <label className="block text-sm font-medium mb-1">Описание</label>
-                  <textarea
-                    value={gameForm.description}
-                    onChange={(e) => setGameForm(prev => ({ ...prev, description: e.target.value }))}
-                    className="w-full px-3 py-2 rounded-lg border bg-background"
-                    rows={3}
-                    placeholder="Описание игры"
-                  />
+                  <textarea value={gameForm.description} onChange={(e) => setGameForm(prev => ({ ...prev, description: e.target.value }))} className="w-full px-3 py-2 rounded-lg border bg-background" rows={3} placeholder="Описание игры" />
                 </div>
-
                 <div>
                   <label className="block text-sm font-medium mb-1">Сложность</label>
-                  <select
-                    value={gameForm.complexity}
-                    onChange={(e) => setGameForm(prev => ({ ...prev, complexity: e.target.value }))}
-                    className="w-full px-3 py-2 rounded-lg border bg-background"
-                  >
+                  <select value={gameForm.complexity} onChange={(e) => setGameForm(prev => ({ ...prev, complexity: e.target.value }))} className="w-full px-3 py-2 rounded-lg border bg-background">
                     <option value="Низкая">Низкая</option>
                     <option value="Средняя">Средняя</option>
                     <option value="Высокая">Высокая</option>
                   </select>
                 </div>
-
                 <div>
                   <label className="block text-sm font-medium mb-2">Развиваемые компетенции</label>
                   <div className="grid grid-cols-2 gap-2">
@@ -541,36 +521,19 @@ export default function AdminPage() {
                       const selected = gameForm.competencies.find(c => c.name === comp.name);
                       return (
                         <div key={comp.id} className="flex items-center gap-2 p-2 rounded-lg border">
-                          <input
-                            type="checkbox"
-                            checked={!!selected}
-                            onChange={() => toggleGameComp(comp.name)}
-                            className="w-4 h-4"
-                          />
+                          <input type="checkbox" checked={!!selected} onChange={() => toggleGameComp(comp.name)} className="w-4 h-4" />
                           <span className="text-sm flex-1">{comp.name}</span>
                           {selected && (
-                            <input
-                              type="number"
-                              min={1}
-                              max={10}
-                              value={selected.score}
-                              onChange={(e) => updateGameCompScore(comp.name, parseInt(e.target.value) || 5)}
-                              className="w-14 px-2 py-1 rounded border bg-background text-sm text-center"
-                            />
+                            <input type="number" min={1} max={10} value={selected.score} onChange={(e) => updateGameCompScore(comp.name, parseInt(e.target.value) || 5)} className="w-14 px-2 py-1 rounded border bg-background text-sm text-center" />
                           )}
                         </div>
                       );
                     })}
                   </div>
                 </div>
-
                 <div className="flex gap-2">
-                  <Button onClick={saveGame} disabled={!gameForm.title.trim()}>
-                    <Save className="h-4 w-4 mr-1" /> Сохранить
-                  </Button>
-                  <Button variant="outline" onClick={() => { setShowGameForm(false); setEditingGame(null); }}>
-                    Отмена
-                  </Button>
+                  <Button onClick={saveGame} disabled={!gameForm.title.trim()}><Save className="h-4 w-4 mr-1" /> Сохранить</Button>
+                  <Button variant="outline" onClick={() => { setShowGameForm(false); setEditingGame(null); }}>Отмена</Button>
                 </div>
               </div>
             )}
@@ -580,9 +543,7 @@ export default function AdminPage() {
                 <div key={game.id} className="p-4 rounded-xl border bg-card">
                   <div className="flex items-center justify-between mb-2">
                     <h3 className="font-semibold">{game.title}</h3>
-                    <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary">
-                      {game.complexity}
-                    </span>
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary">{game.complexity}</span>
                   </div>
                   <p className="text-sm text-muted-foreground mb-3">{game.description}</p>
                   <div className="space-y-1 mb-3">
@@ -594,16 +555,53 @@ export default function AdminPage() {
                     ))}
                   </div>
                   <div className="flex gap-2">
-                    <Button size="sm" variant="outline" onClick={() => startEditGame(game)}>
-                      <Edit3 className="h-3 w-3 mr-1" /> Править
-                    </Button>
-                    <Button size="sm" variant="outline" onClick={() => deleteGame(game.id)}>
-                      <Trash2 className="h-3 w-3 mr-1 text-red-500" /> Удалить
-                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => startEditGame(game)}><Edit3 className="h-3 w-3 mr-1" /> Править</Button>
+                    <Button size="sm" variant="outline" onClick={() => deleteGame(game.id)}><Trash2 className="h-3 w-3 mr-1 text-red-500" /> Удалить</Button>
                   </div>
                 </div>
               ))}
             </div>
+          </div>
+        )}
+
+        {tab === "notes" && (
+          <div className="space-y-4">
+            <h2 className="text-xl font-semibold mb-4">Заметки администраторов</h2>
+
+            <div className="flex gap-2">
+              <textarea
+                value={noteText}
+                onChange={(e) => setNoteText(e.target.value)}
+                placeholder="Напишите заметку..."
+                className="flex-1 px-3 py-2 rounded-lg border bg-background"
+                rows={3}
+              />
+            </div>
+            <Button onClick={addNote} disabled={!noteText.trim()}>
+              <Plus className="h-4 w-4 mr-1" /> Добавить заметку
+            </Button>
+
+            {notes.length === 0 ? (
+              <p className="text-muted-foreground">Нет заметок</p>
+            ) : (
+              <div className="space-y-3">
+                {[...notes].reverse().map((note) => (
+                  <div key={note.id} className="p-4 rounded-xl border bg-card">
+                    <div className="flex items-start justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <StickyNote className="h-4 w-4 text-primary" />
+                        <span className="font-medium text-sm">{note.authorName}</span>
+                        <span className="text-xs text-muted-foreground">{formatDate(note.createdAt)}</span>
+                      </div>
+                      <button onClick={() => deleteNote(note.id)} className="text-muted-foreground hover:text-destructive">
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                    <p className="text-sm whitespace-pre-wrap">{note.text}</p>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>

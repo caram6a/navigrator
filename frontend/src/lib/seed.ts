@@ -18,9 +18,9 @@ export function seedUsers() {
     users.push(fakeHelper);
   }
 
-  // Админ — создаём если его ещё нет
-  const hasAdmin = users.some((u: any) => u.email === "kazak05ia@gmail.com");
-  if (!hasAdmin) {
+  // Админ — создаём только если нет ни одного пользователя
+  const hasAnyUser = users.length > 0;
+  if (!hasAnyUser) {
     const defaultUser = {
       id: "1",
       name: "Илья",
