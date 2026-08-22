@@ -1,13 +1,35 @@
 export function seedUsers() {
-  // Принудительно очищаем всех пользователей при загрузке
-  // чтобы избавиться от дубликатов
-  localStorage.removeItem("users");
-  localStorage.removeItem("token");
-  localStorage.removeItem("currentUser");
-  localStorage.removeItem("guestTestResults");
-  localStorage.removeItem("gameSessions_guest");
+  const existing = localStorage.getItem("users");
+  if (existing) {
+    const users = JSON.parse(existing);
+    // Если есть пользователи и нет дубликатов по email — ничего не делаем
+    const emails = users.map((u: any) => u.email);
+    const hasDuplicates = emails.length !== new Set(emails).size;
+    if (!hasDuplicates) {
+      // Просто проверяем что currentUser существует
+      const token = localStorage.getItem("token");
+      if (token && !localStorage.getItem("currentUser")) {
+        const found = users.find((u: any) => u.id === token);
+        if (found) {
+          localStorage.setItem("currentUser", JSON.stringify(found));
+        }
+      }
+      return;
+    }
+    // Если есть дубликаты — удаляем их, оставляем уникальных
+    const unique: any[] = [];
+    const seen = new Set<string>();
+    for (const u of users) {
+      if (!seen.has(u.email)) {
+        seen.add(u.email);
+        unique.push(u);
+      }
+    }
+    localStorage.setItem("users", JSON.stringify(unique));
+    return;
+  }
 
-  // Создаём только одного пользователя — админа
+  // Первый запуск — создаём пользователей
   const users: any[] = [];
 
   const defaultUser = {
