@@ -1,8 +1,12 @@
-// Сервис отправки кодов подтверждения через собственный API /api/send-code
-// API route отправляет письма через EmailJS (бесплатно 200/мес, любые почты)
+// Сервис отправки кодов подтверждения через EmailJS напрямую (бесплатно, любые почты)
+// Пока не работает API route на Vercel — отправляем с клиента
+
+const EMAILJS_SERVICE_ID = "service_2ngyspj";
+const EMAILJS_TEMPLATE_ID = "template_rgvd4fa";
+const EMAILJS_PUBLIC_KEY = "PaTPepj7Vrt7jYGfr";
 
 // Исключения — могут создавать много аккаунтов без реальной почты
-export const EXCEPTION_EMAILS = ["kazak05ia@gmail.com", "bakes777@yandex.ru", "kazakovilya778@gmail.com"];
+export const EXCEPTION_EMAILS = ["kazak05ia@gmail.com", "bakes777@yandex.ru"];
 
 export function isExceptionEmail(email: string): boolean {
   return EXCEPTION_EMAILS.includes(email.toLowerCase());
@@ -16,12 +20,24 @@ interface EmailParams {
 }
 
 export async function sendVerificationCode(params: EmailParams): Promise<boolean> {
-  // Пробуем отправить через свой API
+  // Отправляем напрямую через EmailJS API (с клиента)
   try {
-    const res = await fetch("/api/send-code", {
+    const typeLabel = params.type === "registration" ? "Регистрация" : "Восстановление пароля";
+
+    const res = await fetch("https://api.emailjs.com/api/v1.0/email/send", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(params),
+      body: JSON.stringify({
+        service_id: EMAILJS_SERVICE_ID,
+        template_id: EMAILJS_TEMPLATE_ID,
+        user_id: EMAILJS_PUBLIC_KEY,
+        template_params: {
+          to_email: params.to_email,
+          to_name: params.to_name,
+          code: params.code,
+          type: typeLabel,
+        },
+      }),
     });
 
     if (res.ok) {
@@ -29,10 +45,10 @@ export async function sendVerificationCode(params: EmailParams): Promise<boolean
       return true;
     }
 
-    const err = await res.json();
-    console.error("Send error:", err);
+    const text = await res.text();
+    console.error("EmailJS error:", res.status, text);
   } catch (err) {
-    console.error("Fetch error:", err);
+    console.error("EmailJS error:", err);
   }
 
   // Если отправка не сработала — регистрация невозможна
