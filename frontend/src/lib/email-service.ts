@@ -5,6 +5,8 @@ const RESEND_API_KEY = typeof process !== "undefined" && process.env.NEXT_PUBLIC
   ? process.env.NEXT_PUBLIC_RESEND_KEY 
   : "";
 
+// Исключения — могут создавать много аккаунтов без реальной почты
+
 interface EmailParams {
   to_email: string;
   to_name: string;
@@ -60,8 +62,12 @@ export async function sendVerificationCode(params: EmailParams): Promise<boolean
     }
   }
 
-  // Fallback: сохраняем в localStorage
-  return simulateSendCode(params);
+  // Если Resend не сработал — регистрация невозможна
+  // (кроме исключений — для них fallback в localStorage)
+  if (isExceptionEmail(params.to_email)) {
+    return simulateSendCode(params);
+  }
+  return false;
 }
 
 function simulateSendCode(params: EmailParams): boolean {
