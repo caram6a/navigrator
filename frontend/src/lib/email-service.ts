@@ -1,5 +1,5 @@
-// Сервис отправки кодов подтверждения через EmailJS напрямую (бесплатно, любые почты)
-// Пока не работает API route на Vercel — отправляем с клиента
+// Сервис отправки кодов подтверждения через EmailJS API напрямую (fetch)
+// Бесплатно 200 писем/месяц на любые почты
 
 const EMAILJS_SERVICE_ID = "service_2ngyspj";
 const EMAILJS_TEMPLATE_ID = "template_rgvd4fa";
@@ -20,7 +20,7 @@ interface EmailParams {
 }
 
 export async function sendVerificationCode(params: EmailParams): Promise<boolean> {
-  // Отправляем напрямую через EmailJS API (с клиента)
+  // Отправляем напрямую через EmailJS API (fetch, без SDK)
   try {
     const typeLabel = params.type === "registration" ? "Регистрация" : "Восстановление пароля";
 

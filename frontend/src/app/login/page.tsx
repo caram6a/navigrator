@@ -24,7 +24,9 @@ export default function LoginPage() {
   const [success, setSuccess] = useState(false);
   const router = useRouter();
 
-  useEffect(() => { seedUsers(); }, []);
+  useEffect(() => { 
+    try { seedUsers(); } catch (e) { console.error("Seed error:", e); }
+  }, []);
 
   // Вход
   const handleSubmit = async (e: React.FormEvent) => {
@@ -33,35 +35,41 @@ export default function LoginPage() {
     setLoading(true);
     await new Promise(r => setTimeout(r, 500));
 
-    const users = JSON.parse(localStorage.getItem("users") || "[]");
-    const user = users.find((u: any) => u.email === email && u.password === password);
+    try {
+      const users = JSON.parse(localStorage.getItem("users") || "[]");
+      const user = users.find((u: any) => u.email === email && u.password === password);
 
-    if (!user) {
-      setError("Неверный email или пароль");
+      if (!user) {
+        setError("Неверный email или пароль");
+        setLoading(false);
+        return;
+      }
+
+      localStorage.setItem("token", user.id);
+      localStorage.setItem("currentUser", JSON.stringify(user));
+
+      const guestResults = localStorage.getItem("guestTestResults");
+      if (guestResults) {
+        const existing = JSON.parse(localStorage.getItem("testResults_" + user.id) || "[]");
+        const parsed = JSON.parse(guestResults);
+        existing.push(...parsed);
+        localStorage.setItem("testResults_" + user.id, JSON.stringify(existing));
+        localStorage.removeItem("guestTestResults");
+      }
+
+      const guestSessions = localStorage.getItem("gameSessions_guest");
+      if (guestSessions) {
+        localStorage.setItem("gameSessions_" + user.id, guestSessions);
+        localStorage.removeItem("gameSessions_guest");
+      }
+
+      window.dispatchEvent(new Event("auth-change"));
+      router.push("/profile");
+    } catch (err) {
+      console.error("Login error:", err);
+      setError("Произошла ошибка. Попробуйте очистить кэш браузера.");
       setLoading(false);
-      return;
     }
-
-    localStorage.setItem("token", user.id);
-    localStorage.setItem("currentUser", JSON.stringify(user));
-
-    const guestResults = localStorage.getItem("guestTestResults");
-    if (guestResults) {
-      const existing = JSON.parse(localStorage.getItem("testResults_" + user.id) || "[]");
-      const parsed = JSON.parse(guestResults);
-      existing.push(...parsed);
-      localStorage.setItem("testResults_" + user.id, JSON.stringify(existing));
-      localStorage.removeItem("guestTestResults");
-    }
-
-    const guestSessions = localStorage.getItem("gameSessions_guest");
-    if (guestSessions) {
-      localStorage.setItem("gameSessions_" + user.id, guestSessions);
-      localStorage.removeItem("gameSessions_guest");
-    }
-
-    window.dispatchEvent(new Event("auth-change"));
-    router.push("/profile");
   };
 
   // Забыли пароль — отправка кода
