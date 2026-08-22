@@ -1,0 +1,10 @@
+node_modules/
+.next/
+.env
+.env.local
+*.zip
+ngrok/
+ngrok2/
+ngrok3/
+tunnel/
+public/

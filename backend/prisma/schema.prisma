@@ -1,0 +1,104 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String   @id @default(cuid())
+  name          String
+  email         String   @unique
+  passwordHash  String   @map("password_hash")
+  role          Role     @default(player)
+  isVerified    Boolean  @default(false) @map("is_verified")
+  mbtiType      String?  @map("mbti_type")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  competencies  UserCompetency[]
+  sessionsAsPlayer Session[] @relation("PlayerSessions")
+  sessionsAsHelper Session[] @relation("HelperSessions")
+
+  @@map("users")
+}
+
+enum Role {
+  admin
+  leader
+  helper
+  player
+}
+
+model Competency {
+  id          String   @id @default(cuid())
+  name        String
+  description String
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  userCompetencies UserCompetency[]
+  gameScores       GameCompetencyScore[]
+
+  @@map("competencies")
+}
+
+model UserCompetency {
+  id           String   @id @default(cuid())
+  userId       String   @map("user_id")
+  competencyId String   @map("competency_id")
+  value        Int
+  testDate     DateTime @default(now()) @map("test_date")
+
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  competency Competency @relation(fields: [competencyId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, competencyId])
+  @@map("user_competencies")
+}
+
+model Game {
+  id          String   @id @default(cuid())
+  title       String
+  description String
+  complexity  String   // easy, medium, hard
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  competencyScores GameCompetencyScore[]
+  sessions         Session[]
+
+  @@map("games")
+}
+
+model GameCompetencyScore {
+  id           String @id @default(cuid())
+  gameId       String @map("game_id")
+  competencyId String @map("competency_id")
+  score        Int    // 1-10
+
+  game       Game       @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  competency Competency @relation(fields: [competencyId], references: [id], onDelete: Cascade)
+
+  @@unique([gameId, competencyId])
+  @@map("game_competency_scores")
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  playerId  String   @map("player_id")
+  helperId  String   @map("helper_id")
+  gameId    String   @map("game_id")
+  status    SessionStatus @default(pending)
+  playedAt  DateTime? @map("played_at")
+
+  player User @relation("PlayerSessions", fields: [playerId], references: [id], onDelete: Cascade)
+  helper User @relation("HelperSessions", fields: [helperId], references: [id], onDelete: Cascade)
+  game   Game @relation(fields: [gameId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+enum SessionStatus {
+  pending
+  completed
+}
