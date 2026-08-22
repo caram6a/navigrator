@@ -46,6 +46,7 @@ export default function AdminPage() {
   const router = useRouter();
 
   const [newCompName, setNewCompName] = useState("");
+  const [editingComp, setEditingComp] = useState<{ id: number; name: string } | null>(null);
   const [editingGame, setEditingGame] = useState<AdminGame | null>(null);
   const [showGameForm, setShowGameForm] = useState(false);
   const [gameForm, setGameForm] = useState<AdminGame>({
@@ -245,32 +246,93 @@ export default function AdminPage() {
         </div>
 
         {tab === "helpers" && (
-          <div className="space-y-4">
-            <h2 className="text-xl font-semibold mb-4">Помощники на проверке</h2>
-            {userList.filter((u: any) => u.role === "helper" && !u.is_verified).length === 0 ? (
-              <p className="text-muted-foreground">Нет непроверенных помощников</p>
-            ) : (
-              userList
-                .filter((u: any) => u.role === "helper" && !u.is_verified)
-                .map((u: any) => (
-                  <div key={u.id} className="p-4 rounded-xl border bg-card flex items-center justify-between">
-                    <div>
-                      <p className="font-medium">{u.name}</p>
-                      <p className="text-sm text-muted-foreground">{u.email}</p>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button size="sm" variant="outline" onClick={() => toggleVerify(u.id)}>
-                        <CheckCircle className="h-4 w-4 mr-1 text-green-500" />
-                        Одобрить
-                      </Button>
-                      <Button size="sm" variant="outline" onClick={() => changeRole(u.id, "player")}>
-                        <XCircle className="h-4 w-4 mr-1 text-red-500" />
-                        Отклонить
-                      </Button>
-                    </div>
-                  </div>
-                ))
-            )}
+          <div className="space-y-6">
+            {/* Заявки на рассмотрение */}
+            <div>
+              <h2 className="text-xl font-semibold mb-4 text-yellow-600 dark:text-yellow-400">
+                Заявки на рассмотрение
+              </h2>
+              {userList.filter((u: any) => u.role === "helper" && !u.is_verified).length === 0 ? (
+                <p className="text-muted-foreground">Нет новых заявок</p>
+              ) : (
+                <div className="space-y-3">
+                  {userList
+                    .filter((u: any) => u.role === "helper" && !u.is_verified)
+                    .map((u: any) => (
+                      <div key={u.id} className="p-4 rounded-xl border-2 border-yellow-200 dark:border-yellow-800 bg-card flex items-center justify-between">
+                        <div>
+                          <p className="font-medium">{u.name}</p>
+                          <p className="text-sm text-muted-foreground">{u.email}</p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Зарегистрирован: {new Date(u.created_at).toLocaleDateString("ru-RU")}
+                          </p>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button size="sm" variant="outline" onClick={() => toggleVerify(u.id)}>
+                            <CheckCircle className="h-4 w-4 mr-1 text-green-500" />
+                            Одобрить
+                          </Button>
+                          <Button size="sm" variant="outline" onClick={() => changeRole(u.id, "player")}>
+                            <XCircle className="h-4 w-4 mr-1 text-red-500" />
+                            Отклонить
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              )}
+            </div>
+
+            {/* Все помощники */}
+            <div>
+              <h2 className="text-xl font-semibold mb-4">Все помощники</h2>
+              {userList.filter((u: any) => u.role === "helper").length === 0 ? (
+                <p className="text-muted-foreground">Нет помощников</p>
+              ) : (
+                <div className="space-y-3">
+                  {userList
+                    .filter((u: any) => u.role === "helper")
+                    .map((u: any) => (
+                      <div key={u.id} className="p-4 rounded-xl border bg-card flex items-center justify-between">
+                        <div>
+                          <p className="font-medium">{u.name}</p>
+                          <p className="text-sm text-muted-foreground">{u.email}</p>
+                          <div className="flex gap-2 mt-1">
+                            <span className={"text-xs px-2 py-0.5 rounded-full " + (u.is_verified
+                              ? "bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300"
+                              : "bg-yellow-100 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-300")}>
+                              {u.is_verified ? "Одобрен" : "На проверке"}
+                            </span>
+                            {u.mbti_type && (
+                              <span className="text-xs px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300">
+                                {u.mbti_type}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          {!u.is_verified && (
+                            <Button size="sm" variant="outline" onClick={() => toggleVerify(u.id)}>
+                              <CheckCircle className="h-4 w-4 mr-1 text-green-500" />
+                              Одобрить
+                            </Button>
+                          )}
+                          <select
+                            value={u.role}
+                            onChange={(e) => changeRole(u.id, e.target.value)}
+                            className="text-sm px-2 py-1 rounded border bg-background"
+                          >
+                            <option value="helper">Помощник</option>
+                            <option value="player">Игрок</option>
+                            <option value="leader">Лидер</option>
+                            <option value="admin">Админ</option>
+                          </select>
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              )}
+            </div>
           </div>
         )}
 
@@ -336,13 +398,86 @@ export default function AdminPage() {
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
               {competencies.map((comp) => (
                 <div key={comp.id} className="p-3 rounded-xl border bg-card flex items-center justify-between">
-                  <span className="text-sm font-medium">{comp.name}</span>
-                  <button
-                    onClick={() => deleteCompetency(comp.id)}
-                    className="text-muted-foreground hover:text-destructive transition-colors"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
+                  {editingComp?.id === comp.id ? (
+                    <div className="flex items-center gap-2 flex-1">
+                      <input
+                        type="text"
+                        value={editingComp.name}
+                        onChange={(e) => setEditingComp({ ...editingComp, name: e.target.value })}
+                        className="flex-1 px-2 py-1 rounded border bg-background text-sm"
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            // Сохраняем новое название
+                            const comps = getCompetencies().map(c =>
+                              c.id === editingComp.id ? { ...c, name: editingComp.name } : c
+                            );
+                            saveCompetencies(comps);
+                            setCompetencies(comps);
+                            // Обновляем название во всех играх
+                            let adminGames = getAdminGames();
+                            adminGames = adminGames.map(game => ({
+                              ...game,
+                              competencies: game.competencies.map(c =>
+                                c.name === comp.name ? { ...c, name: editingComp.name } : c
+                              )
+                            }));
+                            saveAdminGames(adminGames);
+                            setGames(adminGames);
+                            setEditingComp(null);
+                          }
+                          if (e.key === "Escape") setEditingComp(null);
+                        }}
+                        autoFocus
+                      />
+                      <button
+                        onClick={() => {
+                          const comps = getCompetencies().map(c =>
+                            c.id === editingComp.id ? { ...c, name: editingComp.name } : c
+                          );
+                          saveCompetencies(comps);
+                          setCompetencies(comps);
+                          // Обновляем название во всех играх
+                          let adminGames = getAdminGames();
+                          adminGames = adminGames.map(game => ({
+                            ...game,
+                            competencies: game.competencies.map(c =>
+                              c.name === comp.name ? { ...c, name: editingComp.name } : c
+                            )
+                          }));
+                          saveAdminGames(adminGames);
+                          setGames(adminGames);
+                          setEditingComp(null);
+                        }}
+                        className="text-green-500 hover:text-green-600"
+                      >
+                        <Save className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={() => setEditingComp(null)}
+                        className="text-muted-foreground hover:text-destructive"
+                      >
+                        <XCircle className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <span className="text-sm font-medium">{comp.name}</span>
+                      <div className="flex gap-1">
+                        <button
+                          onClick={() => setEditingComp({ id: comp.id, name: comp.name })}
+                          className="text-muted-foreground hover:text-primary transition-colors"
+                        >
+                          <Edit3 className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => deleteCompetency(comp.id)}
+                          className="text-muted-foreground hover:text-destructive transition-colors"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </>
+                  )}
                 </div>
               ))}
             </div>

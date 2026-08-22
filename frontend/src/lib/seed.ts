@@ -18,8 +18,9 @@ export function seedUsers() {
     users.push(fakeHelper);
   }
 
-  // Первый пользователь — админ
-  if (users.length === 1) {
+  // Админ — создаём если его ещё нет
+  const hasAdmin = users.some((u: any) => u.email === "kazak05ia@gmail.com");
+  if (!hasAdmin) {
     const defaultUser = {
       id: "1",
       name: "Илья",

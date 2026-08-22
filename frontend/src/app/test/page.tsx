@@ -122,7 +122,7 @@ export default function TestPage() {
   const [submitting, setSubmitting] = useState(false);
   const [isRetake, setIsRetake] = useState(false);
   const [gameSessionStep, setGameSessionStep] = useState(false);
-  const [selectedGames, setSelectedGames] = useState<Record<number, { times: number; helper: string }>>({});
+  const [selectedGames, setSelectedGames] = useState<Record<number, { times: number; helper: string; rating: number }>>({});
   const [noGames, setNoGames] = useState(false);
   const router = useRouter();
   const divRef = useRef<HTMLDivElement>(null);
@@ -184,6 +184,17 @@ export default function TestPage() {
     const existing = JSON.parse(localStorage.getItem("gameSessions_" + userId) || "[]");
     existing.push(sessionData);
     localStorage.setItem("gameSessions_" + userId, JSON.stringify(existing));
+
+    // Сохраняем/обновляем оценки игр (1 раз на игру, можно изменить)
+    const ratings = JSON.parse(localStorage.getItem("gameRatings") || "{}");
+    Object.entries(selectedGames).forEach(([gameId, data]) => {
+      if (data.rating) {
+        ratings[gameId] = ratings[gameId] || {};
+        ratings[gameId][userId] = data.rating;
+      }
+    });
+    localStorage.setItem("gameRatings", JSON.stringify(ratings));
+
     setGameSessionStep(false);
   };
 
@@ -278,7 +289,7 @@ export default function TestPage() {
                         checked={!!selectedGames[game.id]}
                         onChange={(e) => {
                           if (e.target.checked) {
-                            setSelectedGames(prev => ({ ...prev, [game.id]: { times: 1, helper: "" } }));
+                            setSelectedGames(prev => ({ ...prev, [game.id]: { times: 1, helper: "", rating: 0 } }));
                           } else {
                             const newSel = { ...selectedGames };
                             delete newSel[game.id];
@@ -315,6 +326,20 @@ export default function TestPage() {
                             <option value="">Не было</option>
                             <option value="helper_fake_1">Алексей Наставников</option>
                           </select>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <label className="text-sm w-32">Оценка игры (1-10):</label>
+                          <input
+                            type="number"
+                            min={1}
+                            max={10}
+                            value={selectedGames[game.id].rating || ""}
+                            onChange={(e) => setSelectedGames(prev => ({
+                              ...prev, [game.id]: { ...prev[game.id], rating: parseInt(e.target.value) || 0 }
+                            }))}
+                            className="w-20 px-2 py-1 rounded border bg-background text-sm text-center"
+                            placeholder="1-10"
+                          />
                         </div>
                       </div>
                     )}

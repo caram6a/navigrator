@@ -1,12 +1,32 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Swords, Star } from "lucide-react";
+import { Swords, Star, ThumbsUp } from "lucide-react";
 import { GAMES } from "@/lib/games-data";
 
 export default function GamesPage() {
   const [selectedGame, setSelectedGame] = useState<number | null>(null);
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [gameRatings, setGameRatings] = useState<Record<string, Record<string, number>>>({});
+
+  useEffect(() => {
+    const userData = localStorage.getItem("currentUser");
+    if (userData) {
+      try { setCurrentUser(JSON.parse(userData)); } catch {}
+    }
+    const ratings = JSON.parse(localStorage.getItem("gameRatings") || "{}");
+    setGameRatings(ratings);
+  }, []);
+
+  const getAverageRating = (gameId: number) => {
+    const ratings = gameRatings[gameId];
+    if (!ratings) return null;
+    const values = Object.values(ratings).filter(r => r > 0);
+    if (values.length === 0) return null;
+    const avg = values.reduce((a, b) => a + b, 0) / values.length;
+    return { avg: Math.round(avg * 10) / 10, count: values.length };
+  };
 
   const getComplexityColor = (c: string) => {
     switch (c) {
@@ -54,18 +74,46 @@ export default function GamesPage() {
                 </div>
               ))}
             </div>
+            {(() => {
+              const rating = getAverageRating(game.id);
+              if (!rating) return null;
+              return (
+                <div className="mt-3 pt-3 border-t flex items-center gap-2 text-sm">
+                  <ThumbsUp className="h-4 w-4 text-blue-500" />
+                  <span className="font-medium text-blue-600 dark:text-blue-400">{rating.avg}/10</span>
+                  <span className="text-xs text-muted-foreground">({rating.count} оценок)</span>
+                </div>
+              );
+            })()}
           </div>
         ))}
       </div>
 
       <div className="mt-12 max-w-md mx-auto">
         <div className="text-center p-6 rounded-xl border bg-card">
-          <p className="text-muted-foreground mb-4">
-            {selectedGame
-              ? "Для создания сессии с помощником необходимо войти в систему"
-              : "Выберите игру, чтобы увидеть подробности"}
-          </p>
-          <Button onClick={() => window.location.href = "/login"}>Войти</Button>
+          {currentUser ? (
+            <>
+              <p className="text-muted-foreground mb-4">
+                {selectedGame
+                  ? "Выберите помощника для игры"
+                  : "Выберите игру, чтобы начать"}
+              </p>
+              {selectedGame && (
+                <Button onClick={() => window.location.href = `/helpers?game=${selectedGame}`}>
+                  Выбрать помощника
+                </Button>
+              )}
+            </>
+          ) : (
+            <>
+              <p className="text-muted-foreground mb-4">
+                {selectedGame
+                  ? "Для создания сессии с помощником необходимо войти в систему"
+                  : "Выберите игру, чтобы увидеть подробности"}
+              </p>
+              <Button onClick={() => window.location.href = "/login"}>Войти</Button>
+            </>
+          )}
         </div>
       </div>
     </div>
