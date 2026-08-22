@@ -16,7 +16,7 @@ export const metadata = {
     url: "https://navigrator.vercel.app",
   },
   verification: {
-    yandex: "ваш_код_подтверждения",
+    yandex: "2564abf5ab918f74",
   },
 };
 
@@ -28,7 +28,7 @@ export default function RootLayout({
   return (
     <html lang="ru" suppressHydrationWarning>
       <head>
-        <meta name="yandex-verification" content="ваш_код_подтверждения" />
+        <meta name="yandex-verification" content="2564abf5ab918f74" />
       </head>
       <body className={`${inter.className} bg-background text-foreground`}>
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
