@@ -1,12 +1,10 @@
 export function seedUsers() {
+  // Создаём пользователей ТОЛЬКО если их вообще нет
   const existing = localStorage.getItem("users");
   if (existing) {
     const users = JSON.parse(existing);
-    // Если есть пользователи и нет дубликатов по email — ничего не делаем
-    const emails = users.map((u: any) => u.email);
-    const hasDuplicates = emails.length !== new Set(emails).size;
-    if (!hasDuplicates) {
-      // Просто проверяем что currentUser существует
+    if (users.length > 0) {
+      // Восстанавливаем currentUser если есть token
       const token = localStorage.getItem("token");
       if (token && !localStorage.getItem("currentUser")) {
         const found = users.find((u: any) => u.id === token);
@@ -16,17 +14,6 @@ export function seedUsers() {
       }
       return;
     }
-    // Если есть дубликаты — удаляем их, оставляем уникальных
-    const unique: any[] = [];
-    const seen = new Set<string>();
-    for (const u of users) {
-      if (!seen.has(u.email)) {
-        seen.add(u.email);
-        unique.push(u);
-      }
-    }
-    localStorage.setItem("users", JSON.stringify(unique));
-    return;
   }
 
   // Первый запуск — создаём пользователей
