@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-// Resend API Key (закодирован в base64 для безопасности)
+// Resend API Key (закодирован в base64)
 const RESEND_KEY = Buffer.from("cmVfUm14OFk5d2RfQW9ZcVpvUXNhOUJVTWs5emdjUEhEU3B1", "base64").toString();
 
 export async function POST(request: Request) {
@@ -54,7 +54,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: true });
     } else {
       console.error("Resend error:", data);
-      return NextResponse.json({ error: "Failed to send" }, { status: 500 });
+      return NextResponse.json({ 
+        error: "Failed to send", 
+        details: data,
+        hint: "Добавьте email получателя в Resend Dashboard → Audiences → Add email"
+      }, { status: 500 });
     }
   } catch (err) {
     console.error("API error:", err);
