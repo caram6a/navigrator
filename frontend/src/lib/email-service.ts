@@ -1,11 +1,12 @@
 // Сервис отправки кодов подтверждения через Resend.com
 // API Key задаётся на Vercel через переменную окружения
 
-const RESEND_API_KEY = typeof process !== "undefined" && process.env.NEXT_PUBLIC_RESEND_KEY 
-  ? process.env.NEXT_PUBLIC_RESEND_KEY 
-  : "";
-
 // Исключения — могут создавать много аккаунтов без реальной почты
+export const EXCEPTION_EMAILS = ["kazak05ia@gmail.com", "bakes777@yandex.ru"];
+
+export function isExceptionEmail(email: string): boolean {
+  return EXCEPTION_EMAILS.includes(email.toLowerCase());
+}
 
 interface EmailParams {
   to_email: string;
@@ -14,16 +15,29 @@ interface EmailParams {
   type: "registration" | "password_reset";
 }
 
+// Получаем ключ безопасно (клиентский код)
+function getResendKey(): string {
+  try {
+    if (typeof window !== "undefined") {
+      // @ts-ignore
+      return window.__NEXT_DATA__?.props?.pageProps?.env?.NEXT_PUBLIC_RESEND_KEY || "";
+    }
+  } catch {}
+  return "";
+}
+
 export async function sendVerificationCode(params: EmailParams): Promise<boolean> {
+  const apiKey = getResendKey();
+
   // Пробуем отправить через Resend
-  if (RESEND_API_KEY) {
+  if (apiKey) {
     try {
       const typeLabel = params.type === "registration" ? "Регистрация" : "Восстановление пароля";
       
       const res = await fetch("https://api.resend.com/emails", {
         method: "POST",
         headers: {
-          "Authorization": `Bearer ${RESEND_API_KEY}`,
+          "Authorization": `Bearer ${apiKey}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
@@ -103,10 +117,4 @@ export function verifyCode(email: string, code: string): boolean {
   delete codes[email];
   localStorage.setItem("verificationCodes", JSON.stringify(codes));
   return true;
-}
-
-export const EXCEPTION_EMAILS = ["kazak05ia@gmail.com", "bakes777@yandex.ru"];
-
-export function isExceptionEmail(email: string): boolean {
-  return EXCEPTION_EMAILS.includes(email.toLowerCase());
 }
