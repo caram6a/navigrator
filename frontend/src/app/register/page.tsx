@@ -51,21 +51,49 @@ export default function RegisterPage() {
     const newCode = generateCode();
     setSentCode(newCode);
 
-    const sent = await sendVerificationCode({
-      to_email: email,
-      to_name: name,
-      code: newCode,
-      type: "registration",
-    });
-
     setLoading(false);
 
-    if (sent) {
-      setStep("verify");
-      startResendTimer();
-    } else {
-      setError("Не удалось отправить код. Попробуйте позже.");
+    // TODO: Вернуть подтверждение по коду после настройки EmailJS
+    // Пока пропускаем верификацию — сразу создаём пользователя
+    const usersList = JSON.parse(localStorage.getItem("users") || "[]");
+    const isFirst = usersList.length === 0;
+
+    const newUser = {
+      id: Date.now().toString(),
+      name,
+      email,
+      password,
+      role: isFirst ? "admin" : role,
+      is_verified: isFirst ? true : (role === "player" ? true : false),
+      mbti_type: null,
+      created_at: new Date().toISOString(),
+    };
+
+    usersList.push(newUser);
+    localStorage.setItem("users", JSON.stringify(usersList));
+    localStorage.setItem("token", newUser.id);
+    localStorage.setItem("currentUser", JSON.stringify(newUser));
+
+    // Переносим гостевые данные
+    const guestResults = localStorage.getItem("guestTestResults");
+    if (guestResults) {
+      const existing = JSON.parse(localStorage.getItem("testResults_" + newUser.id) || "[]");
+      existing.push(...JSON.parse(guestResults));
+      localStorage.setItem("testResults_" + newUser.id, JSON.stringify(existing));
+      localStorage.removeItem("guestTestResults");
     }
+
+    const guestSessions = localStorage.getItem("gameSessions_guest");
+    if (guestSessions) {
+      localStorage.setItem("gameSessions_" + newUser.id, guestSessions);
+      localStorage.removeItem("gameSessions_guest");
+    }
+
+    window.dispatchEvent(new Event("auth-change"));
+    setSuccess(true);
+
+    setTimeout(() => router.push("/test"), 1500);
+    return;
   };
 
   const startResendTimer = () => {
@@ -352,8 +380,8 @@ export default function RegisterPage() {
           )}
 
           <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Mail className="h-4 w-4 mr-2" />}
-            {loading ? "Отправка кода..." : "Получить код подтверждения"}
+            {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <User className="h-4 w-4 mr-2" />}
+            {loading ? "Регистрация..." : "Зарегистрироваться"}
           </Button>
         </form>
 
