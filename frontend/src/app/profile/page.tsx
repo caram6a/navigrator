@@ -23,7 +23,6 @@ export default function ProfilePage() {
   };
 
   useEffect(() => {
-    seedUsers();
     const token = localStorage.getItem("token");
     if (!token) {
       setLoading(false);

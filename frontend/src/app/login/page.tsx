@@ -25,7 +25,7 @@ export default function LoginPage() {
   const router = useRouter();
 
   useEffect(() => { 
-    try { seedUsers(); } catch (e) { console.error("Seed error:", e); }
+    // seedUsers() вызывается только на главной странице
   }, []);
 
   // Вход
