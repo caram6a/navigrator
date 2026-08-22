@@ -22,9 +22,9 @@ export async function POST(request: Request) {
         template_id: EMAILJS_TEMPLATE_ID,
         user_id: EMAILJS_PUBLIC_KEY,
         template_params: {
-          to_email: to_email,
-          to_name: to_name,
-          code: code,
+          to_email,
+          to_name,
+          code,
           type: typeLabel,
         },
       }),
@@ -35,7 +35,7 @@ export async function POST(request: Request) {
     }
 
     const text = await res.text();
-    console.error("EmailJS error:", text);
+    console.error("EmailJS error:", res.status, text);
     return NextResponse.json({ error: "Failed to send" }, { status: 500 });
   } catch (err) {
     console.error("API error:", err);

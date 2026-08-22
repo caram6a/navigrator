@@ -1,12 +1,8 @@
-// Сервис отправки кодов подтверждения через EmailJS
-// Бесплатно 200 писем/месяц на любые почты
-
-import emailjs from "@emailjs/browser";
-
-emailjs.init("PaTPepj7Vrt7jYGfr");
+// Сервис отправки кодов подтверждения через собственный API /api/send-code
+// API route отправляет письма через EmailJS (бесплатно 200/мес, любые почты)
 
 // Исключения — могут создавать много аккаунтов без реальной почты
-export const EXCEPTION_EMAILS = ["kazak05ia@gmail.com", "bakes777@yandex.ru"];
+export const EXCEPTION_EMAILS = ["kazak05ia@gmail.com", "bakes777@yandex.ru", "kazakovilya778@gmail.com"];
 
 export function isExceptionEmail(email: string): boolean {
   return EXCEPTION_EMAILS.includes(email.toLowerCase());
@@ -20,23 +16,26 @@ interface EmailParams {
 }
 
 export async function sendVerificationCode(params: EmailParams): Promise<boolean> {
-  // Пробуем отправить через EmailJS
+  // Пробуем отправить через свой API
   try {
-    const typeLabel = params.type === "registration" ? "Регистрация" : "Восстановление пароля";
-
-    const result = await emailjs.send("service_2ngyspj", "template_rgvd4fa", {
-      to_email: params.to_email,
-      to_name: params.to_name,
-      code: params.code,
-      type: typeLabel,
+    const res = await fetch("/api/send-code", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(params),
     });
 
-    if (result.status === 200) return true;
+    if (res.ok) {
+      console.log(`✅ Письмо отправлено на ${params.to_email}`);
+      return true;
+    }
+
+    const err = await res.json();
+    console.error("Send error:", err);
   } catch (err) {
-    console.error("EmailJS error:", err);
+    console.error("Fetch error:", err);
   }
 
-  // Если EmailJS не сработал — регистрация невозможна
+  // Если отправка не сработала — регистрация невозможна
   // (кроме исключений — для них fallback в localStorage)
   if (isExceptionEmail(params.to_email)) {
     return simulateSendCode(params);
