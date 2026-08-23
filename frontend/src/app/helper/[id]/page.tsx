@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { User, Star, Gamepad2, Users, TrendingUp, Calendar, ArrowUp, ArrowDown, Loader2, ChevronDown, ChevronUp, Brain } from "lucide-react";
+import { User, Star, Gamepad2, Users, TrendingUp, ArrowUp, ArrowDown, Loader2, MessageCircle } from "lucide-react";
 import { GAMES } from "@/lib/games-data";
 
 export default function HelperProfilePage() {
@@ -13,7 +13,13 @@ export default function HelperProfilePage() {
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [selectedGame, setSelectedGame] = useState<number | null>(null);
-  const [expandedStudent, setExpandedStudent] = useState<string | null>(null);
+
+  const scaleNames: Record<string, string> = {
+    EI: "Экстраверсия — Интроверсия",
+    SN: "Интуиция — Сенсорика",
+    TF: "Мышление — Чувство",
+    JP: "Суждение — Восприятие",
+  };
 
   useEffect(() => {
     const users = JSON.parse(localStorage.getItem("users") || "[]");
@@ -42,7 +48,7 @@ export default function HelperProfilePage() {
     return Math.min(5, Math.round((completed.length / sessions.length) * 5));
   };
 
-  // Ученики помощника (уникальные)
+  // Ученики помощника (уникальные, без деталей)
   const getHelperStudents = () => {
     if (!helper) return [];
     const allUsers = JSON.parse(localStorage.getItem("users") || "[]");
@@ -57,7 +63,6 @@ export default function HelperProfilePage() {
         students.push({
           ...u,
           sessionCount: helperSessions.length,
-          sessions: helperSessions,
         });
       }
     });
@@ -98,47 +103,56 @@ export default function HelperProfilePage() {
     })).filter(item => item.game);
   };
 
-  // Средний прогресс учеников (по среднему баллу)
-  const getAverageProgress = () => {
+  // Средние изменения по каждой компетенции (по всем ученикам)
+  const getAverageCompetencyChanges = () => {
     if (!helper) return null;
     const allUsers = JSON.parse(localStorage.getItem("users") || "[]");
-    let totalDelta = 0;
-    let count = 0;
+    const totals: Record<string, { sum: number; count: number }> = {
+      EI: { sum: 0, count: 0 },
+      SN: { sum: 0, count: 0 },
+      TF: { sum: 0, count: 0 },
+      JP: { sum: 0, count: 0 },
+    };
+    let avgSum = 0;
+    let avgCount = 0;
+
     allUsers.forEach((u: any) => {
       const results = JSON.parse(localStorage.getItem("testResults_" + u.id) || "[]");
       if (results.length >= 2) {
         const last = results[results.length - 1];
         const prev = results[results.length - 2];
-        if (last && prev) {
-          totalDelta += (last.average - prev.average);
-          count++;
+        if (last && prev && last.dimensions && prev.dimensions) {
+          ["EI", "SN", "TF", "JP"].forEach(key => {
+            const lastScore = last.dimensions[key]?.score || 0;
+            const prevScore = prev.dimensions[key]?.score || 0;
+            totals[key].sum += (lastScore - prevScore);
+            totals[key].count++;
+          });
+          avgSum += (last.average - prev.average);
+          avgCount++;
         }
       }
     });
-    if (count === 0) return null;
-    return Math.round((totalDelta / count) * 10) / 10;
-  };
 
-  // Изменения по компетенциям для ученика
-  const getStudentCompetencyChanges = (studentId: string) => {
-    const results = JSON.parse(localStorage.getItem("testResults_" + studentId) || "[]");
-    if (results.length < 2) return null;
-    const last = results[results.length - 1];
-    const prev = results[results.length - 2];
-    if (!last || !prev || !last.dimensions || !prev.dimensions) return null;
-    
     const changes: Record<string, number> = {};
     ["EI", "SN", "TF", "JP"].forEach(key => {
-      const lastScore = last.dimensions[key]?.score || 0;
-      const prevScore = prev.dimensions[key]?.score || 0;
-      changes[key] = lastScore - prevScore;
+      if (totals[key].count > 0) {
+        changes[key] = Math.round((totals[key].sum / totals[key].count) * 10) / 10;
+      }
     });
+
     return {
-      averageDelta: Math.round((last.average - prev.average) * 10) / 10,
       changes,
-      lastResult: last,
-      prevResult: prev,
+      averageDelta: avgCount > 0 ? Math.round((avgSum / avgCount) * 10) / 10 : null,
     };
+  };
+
+  // Есть ли у текущего пользователя активный чат с этим помощником
+  const getActiveChatSessionId = () => {
+    if (!currentUser) return null;
+    const sessions = JSON.parse(localStorage.getItem("gameSessions_" + currentUser.id) || "[]");
+    const active = sessions.find((s: any) => s.helperId === helper?.id && s.status === "pending");
+    return active?.id || null;
   };
 
   if (loading) {
@@ -163,14 +177,8 @@ export default function HelperProfilePage() {
   const students = getHelperStudents();
   const gamesWithCount = getHelperGamesWithCount();
   const gameCount = getHelperGameCount();
-  const avgProgress = getAverageProgress();
-
-  const scaleNames: Record<string, string> = {
-    EI: "Экстраверсия — Интроверсия",
-    SN: "Интуиция — Сенсорика",
-    TF: "Мышление — Чувство",
-    JP: "Суждение — Восприятие",
-  };
+  const compChanges = getAverageCompetencyChanges();
+  const activeChatId = getActiveChatSessionId();
 
   return (
     <div className="container mx-auto px-4 py-12">
@@ -219,8 +227,8 @@ export default function HelperProfilePage() {
             <div className="p-4 rounded-xl border bg-card text-center">
               <TrendingUp className="h-5 w-5 mx-auto mb-1 text-muted-foreground" />
               <p className="text-2xl font-bold">
-                {avgProgress !== null 
-                  ? (avgProgress >= 0 ? `+${avgProgress}` : `${avgProgress}`)
+                {compChanges?.averageDelta !== null && compChanges?.averageDelta !== undefined
+                  ? (compChanges.averageDelta >= 0 ? `+${compChanges.averageDelta}` : `${compChanges.averageDelta}`)
                   : "—"}
               </p>
               <p className="text-xs text-muted-foreground">средний рост</p>
@@ -242,101 +250,69 @@ export default function HelperProfilePage() {
           )}
         </div>
 
-        {/* Список учеников */}
+        {/* Средние изменения по компетенциям */}
+        {compChanges && Object.keys(compChanges.changes).length > 0 && (
+          <div className="p-6 rounded-xl border bg-card">
+            <div className="flex items-center gap-2 mb-4">
+              <TrendingUp className="h-5 w-5 text-blue-500" />
+              <h2 className="text-xl font-semibold">Средний рост по компетенциям</h2>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              {Object.entries(compChanges.changes).map(([key, delta]) => (
+                <div key={key} className="flex items-center justify-between p-3 rounded-lg border">
+                  <span className="text-sm">{scaleNames[key]}</span>
+                  <span className={`text-sm font-medium ${delta >= 0 ? "text-green-500" : "text-red-500"}`}>
+                    {delta >= 0 ? <ArrowUp className="h-4 w-4 inline" /> : <ArrowDown className="h-4 w-4 inline" />}
+                    {delta >= 0 ? "+" : ""}{delta}%
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Список учеников (простой) */}
         {students.length > 0 && (
           <div className="p-6 rounded-xl border bg-card">
             <div className="flex items-center gap-2 mb-4">
               <Users className="h-5 w-5 text-blue-500" />
               <h2 className="text-xl font-semibold">Ученики ({students.length})</h2>
             </div>
-            <div className="space-y-3">
-              {students.map((student) => {
-                const compChanges = getStudentCompetencyChanges(student.id);
-                const isExpanded = expandedStudent === student.id;
-                return (
-                  <div key={student.id} className="rounded-lg border overflow-hidden">
-                    <button
-                      onClick={() => setExpandedStudent(isExpanded ? null : student.id)}
-                      className="w-full flex items-center justify-between p-3 hover:bg-muted/50 transition-colors text-left"
-                    >
-                      <div className="flex items-center gap-3">
-                        <User className="h-8 w-8 p-1.5 rounded-full bg-primary/10 text-primary" />
-                        <div>
-                          <p className="font-medium">{student.name}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {student.sessionCount} сессий
-                            {student.mbti_type ? ` | ${student.mbti_type}` : ""}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        {compChanges && (
-                          <span className={`text-sm font-medium ${compChanges.averageDelta >= 0 ? "text-green-500" : "text-red-500"}`}>
-                            {compChanges.averageDelta >= 0 ? "+" : ""}{compChanges.averageDelta}
-                          </span>
-                        )}
-                        {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                      </div>
-                    </button>
-                    
-                    {isExpanded && (
-                      <div className="px-3 pb-3 space-y-3">
-                        {/* Сессии ученика с этим помощником */}
-                        <div>
-                          <p className="text-xs font-medium text-muted-foreground mb-1">Сессии:</p>
-                          {student.sessions.map((s: any, i: number) => (
-                            <div key={i} className="flex items-center justify-between text-sm py-1">
-                              <span>
-                                {s.gameId ? GAMES.find(g => g.id === s.gameId)?.title || "Без игры" : "Без игры"}
-                              </span>
-                              <span className="text-muted-foreground">
-                                {s.date ? new Date(s.date).toLocaleDateString("ru-RU") : ""}
-                                {" | "}
-                                {s.status === "completed" ? "Завершена" : "Ожидает"}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-
-                        {/* Изменения по компетенциям */}
-                        {compChanges && (
-                          <div>
-                            <p className="text-xs font-medium text-muted-foreground mb-1">Изменения после последней игры:</p>
-                            <div className="grid grid-cols-2 gap-2">
-                              {Object.entries(compChanges.changes).map(([key, delta]) => (
-                                <div key={key} className="flex items-center justify-between text-sm p-2 rounded bg-muted/50">
-                                  <span className="text-xs">{scaleNames[key]}</span>
-                                  <span className={`font-medium ${delta >= 0 ? "text-green-500" : "text-red-500"}`}>
-                                    {delta >= 0 ? <ArrowUp className="h-3 w-3 inline" /> : <ArrowDown className="h-3 w-3 inline" />}
-                                    {delta >= 0 ? "+" : ""}{delta}%
-                                  </span>
-                                </div>
-                              ))}
-                            </div>
-                            <div className="flex items-center justify-between text-sm p-2 rounded bg-muted/50 mt-1">
-                              <span className="text-xs">Средний балл</span>
-                              <span className={`font-medium ${compChanges.averageDelta >= 0 ? "text-green-500" : "text-red-500"}`}>
-                                {compChanges.averageDelta >= 0 ? <ArrowUp className="h-3 w-3 inline" /> : <ArrowDown className="h-3 w-3 inline" />}
-                                {compChanges.averageDelta >= 0 ? "+" : ""}{compChanges.averageDelta}
-                              </span>
-                            </div>
-                          </div>
-                        )}
-
-                        {!compChanges && (
-                          <p className="text-xs text-muted-foreground">Нет данных для сравнения (нужно минимум 2 теста)</p>
-                        )}
-                      </div>
-                    )}
+            <div className="grid gap-3 sm:grid-cols-2">
+              {students.map((student) => (
+                <div key={student.id} className="flex items-center gap-3 p-3 rounded-lg border">
+                  <User className="h-8 w-8 p-1.5 rounded-full bg-primary/10 text-primary flex-shrink-0" />
+                  <div className="min-w-0">
+                    <p className="font-medium truncate">{student.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {student.sessionCount} сессий
+                      {student.mbti_type ? ` · ${student.mbti_type}` : ""}
+                    </p>
                   </div>
-                );
-              })}
+                </div>
+              ))}
             </div>
           </div>
         )}
 
-        {/* Создать сессию */}
-        {currentUser && (
+        {/* Создать сессию / Перейти в чат */}
+        {currentUser && activeChatId ? (
+          <div className="p-6 rounded-xl border bg-card">
+            <div className="flex items-center gap-3 mb-4">
+              <MessageCircle className="h-6 w-6 text-green-500" />
+              <div>
+                <h2 className="text-xl font-semibold">Активный чат</h2>
+                <p className="text-sm text-muted-foreground">
+                  У вас есть активная сессия с {helper.name}
+                </p>
+              </div>
+            </div>
+            <Button onClick={() => router.push("/chat/" + activeChatId)}>
+              <MessageCircle className="h-4 w-4 mr-2" />
+              Перейти в чат
+            </Button>
+          </div>
+        ) : currentUser ? (
           <div className="p-6 rounded-xl border bg-card">
             <h2 className="text-xl font-semibold mb-4">Создать игровую сессию</h2>
             <p className="text-muted-foreground mb-4">
@@ -347,14 +323,16 @@ export default function HelperProfilePage() {
             <div className="flex gap-2">
               <Button
                 onClick={() => {
-                  // Проверяем, есть ли уже такая сессия
                   const sessions = JSON.parse(localStorage.getItem("gameSessions_" + currentUser.id) || "[]");
                   const exists = sessions.some(
                     (s: any) => s.helperId === helper.id && s.gameId === selectedGame && s.status === "pending"
                   );
                   
                   if (exists) {
-                    router.push("/profile");
+                    const existing = sessions.find(
+                      (s: any) => s.helperId === helper.id && s.gameId === selectedGame && s.status === "pending"
+                    );
+                    router.push("/chat/" + existing.id);
                     return;
                   }
 
@@ -368,9 +346,10 @@ export default function HelperProfilePage() {
                   };
                   sessions.push(session);
                   localStorage.setItem("gameSessions_" + currentUser.id, JSON.stringify(sessions));
-                  router.push("/profile");
+                  router.push("/chat/" + session.id);
                 }}
               >
+                <MessageCircle className="h-4 w-4 mr-2" />
                 Начать сессию
               </Button>
               <Button variant="outline" onClick={() => router.push("/games")}>
@@ -378,9 +357,7 @@ export default function HelperProfilePage() {
               </Button>
             </div>
           </div>
-        )}
-
-        {!currentUser && (
+        ) : (
           <div className="text-center p-6 rounded-xl border bg-card">
             <p className="text-muted-foreground mb-4">Войдите, чтобы создать сессию с наставником</p>
             <Button onClick={() => router.push("/login")}>Войти</Button>
