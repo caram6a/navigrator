@@ -13,12 +13,19 @@ const app = express();
 const PORT = process.env.PORT || 4000;
 
 app.use(cors({
-  origin: [
-    "http://localhost:3000",
-    "http://localhost:3001",
-    "https://navigrator.vercel.app",
-    "https://navigrator-git-master-caram6as-projects.vercel.app",
-  ],
+  origin: function (origin, callback) {
+    // Разрешаем запросы без origin (сервер-сервер) и все Vercel/локальные домены
+    const allowed = [
+      "http://localhost:3000",
+      "http://localhost:3001",
+      "https://navigrator.vercel.app",
+    ];
+    if (!origin || allowed.some(a => origin.startsWith(a) || origin.includes("vercel.app"))) {
+      callback(null, true);
+    } else {
+      callback(new Error("Not allowed by CORS"));
+    }
+  },
   credentials: true,
 }));
 app.use(express.json());
