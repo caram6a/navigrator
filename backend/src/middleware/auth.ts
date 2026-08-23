@@ -50,3 +50,6 @@ export function requireRole(...roles: string[]) {
     next();
   };
 }
+
+// Алиас для удобства — проверка на админа
+export const requireAdmin = requireRole("admin", "leader");

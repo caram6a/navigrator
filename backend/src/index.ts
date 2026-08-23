@@ -7,6 +7,7 @@ import { competenciesRouter } from "./api/competencies";
 import { gamesRouter } from "./api/games";
 import { sessionsRouter } from "./api/sessions";
 import { testRouter } from "./api/test";
+import { notesRouter } from "./api/notes";
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -29,6 +30,7 @@ app.use("/api/competencies", competenciesRouter);
 app.use("/api/games", gamesRouter);
 app.use("/api/sessions", sessionsRouter);
 app.use("/api/test", testRouter);
+app.use("/api/notes", notesRouter);
 
 // Error handler
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
