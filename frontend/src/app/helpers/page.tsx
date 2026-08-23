@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Users, Star, Gamepad2, TrendingUp, Search, Loader2, MessageCircle } from "lucide-react";
 import { GAMES } from "@/lib/games-data";
+import { users as usersApi } from "@/lib/api";
 
 export default function HelpersPage() {
   const router = useRouter();
@@ -15,10 +16,17 @@ export default function HelpersPage() {
   const [currentUser, setCurrentUser] = useState<any>(null);
 
   useEffect(() => {
-    const users = JSON.parse(localStorage.getItem("users") || "[]");
-    const verifiedHelpers = users.filter((u: any) => u.role === "helper" && u.is_verified);
-    setHelpers(verifiedHelpers);
-    setLoading(false);
+    // Try to load from API first, fallback to localStorage
+    usersApi.helpers().then(res => {
+      if (res.helpers && res.helpers.length > 0) {
+        setHelpers(res.helpers);
+        setLoading(false);
+      } else {
+        loadLocalHelpers();
+      }
+    }).catch(() => {
+      loadLocalHelpers();
+    });
 
     const userData = localStorage.getItem("currentUser");
     if (userData) { try { setCurrentUser(JSON.parse(userData)); } catch {} }
@@ -27,6 +35,13 @@ export default function HelpersPage() {
     const gameId = params.get("game");
     if (gameId) setSelectedGame(parseInt(gameId));
   }, []);
+
+  const loadLocalHelpers = () => {
+    const users = JSON.parse(localStorage.getItem("users") || "[]");
+    const verifiedHelpers = users.filter((u: any) => u.role === "helper" && u.is_verified);
+    setHelpers(verifiedHelpers);
+    setLoading(false);
+  };
 
   // Рейтинг помощника
   const getHelperRating = (helperId: string) => {
@@ -139,10 +154,10 @@ export default function HelpersPage() {
                     )}
                   </div>
 
-                  {helper.mbti_type && (
+                  {helper.mbtiType && (
                     <div className="mb-3">
                       <span className="text-xs px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300">
-                        {helper.mbti_type}
+                        {helper.mbtiType}
                       </span>
                     </div>
                   )}

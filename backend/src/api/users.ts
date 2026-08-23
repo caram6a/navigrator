@@ -31,7 +31,7 @@ usersRouter.get('/helpers', async (_req: Request, res: Response) => {
   try {
     const helpers = await prisma.user.findMany({
       where: { role: 'helper', isVerified: true },
-      select: { id: true, name: true },
+      select: { id: true, name: true, email: true, mbtiType: true },
     });
     res.json({ helpers });
   } catch (error) {

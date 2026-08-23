@@ -1,10 +1,11 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { User, Star, Gamepad2, Users, TrendingUp, ArrowUp, ArrowDown, Loader2, MessageCircle } from "lucide-react";
 import { GAMES } from "@/lib/games-data";
+import { users as usersApi } from "@/lib/api";
 
 export default function HelperProfilePage() {
   const router = useRouter();
@@ -15,16 +16,25 @@ export default function HelperProfilePage() {
   const [selectedGame, setSelectedGame] = useState<number | null>(null);
 
   const scaleNames: Record<string, string> = {
-    EI: "Экстраверсия — Интроверсия",
-    SN: "Интуиция — Сенсорика",
-    TF: "Мышление — Чувство",
-    JP: "Суждение — Восприятие",
+    EI: "Р­РєСЃС‚СЂР°РІРµСЂСЃРёСЏ вЂ” РРЅС‚СЂРѕРІРµСЂСЃРёСЏ",
+    SN: "РРЅС‚СѓРёС†РёСЏ вЂ” РЎРµРЅСЃРѕСЂРёРєР°",
+    TF: "РњС‹С€Р»РµРЅРёРµ вЂ” Р§СѓРІСЃС‚РІРѕ",
+    JP: "РЎСѓР¶РґРµРЅРёРµ вЂ” Р’РѕСЃРїСЂРёСЏС‚РёРµ",
   };
 
   useEffect(() => {
     const users = JSON.parse(localStorage.getItem("users") || "[]");
-    const found = users.find((u: any) => u.id === params.id);
-    setHelper(found || null);
+    let found = users.find((u: any) => u.id === params.id);
+    
+    if (found) {
+      if ((found as any).mbti_type && !(found as any).mbtiType) (found as any).mbtiType = (found as any).mbti_type;
+      setHelper(found);
+    } else {
+      setHelper(null);
+      usersApi.getById(params.id as string).then(res => {
+        if (res.user) setHelper(res.user);
+      }).catch(() => {});
+    }
 
     const userData = localStorage.getItem("currentUser");
     if (userData) {
@@ -38,7 +48,7 @@ export default function HelperProfilePage() {
     setLoading(false);
   }, [params.id]);
 
-  // Рейтинг помощника
+  // Р РµР№С‚РёРЅРі РїРѕРјРѕС‰РЅРёРєР°
   const getHelperRating = () => {
     if (!helper) return null;
     const sessions = JSON.parse(localStorage.getItem("gameSessions_" + helper.id) || "[]");
@@ -48,7 +58,7 @@ export default function HelperProfilePage() {
     return Math.min(5, Math.round((completed.length / sessions.length) * 5));
   };
 
-  // Ученики помощника (уникальные, без деталей)
+  // РЈС‡РµРЅРёРєРё РїРѕРјРѕС‰РЅРёРєР° (СѓРЅРёРєР°Р»СЊРЅС‹Рµ, Р±РµР· РґРµС‚Р°Р»РµР№)
   const getHelperStudents = () => {
     if (!helper) return [];
     const allUsers = JSON.parse(localStorage.getItem("users") || "[]");
@@ -70,7 +80,7 @@ export default function HelperProfilePage() {
     return students;
   };
 
-  // Сколько раз помощник вёл игры (сумма всех сессий)
+  // РЎРєРѕР»СЊРєРѕ СЂР°Р· РїРѕРјРѕС‰РЅРёРє РІС‘Р» РёРіСЂС‹ (СЃСѓРјРјР° РІСЃРµС… СЃРµСЃСЃРёР№)
   const getHelperGameCount = () => {
     if (!helper) return 0;
     const allUsers = JSON.parse(localStorage.getItem("users") || "[]");
@@ -82,7 +92,7 @@ export default function HelperProfilePage() {
     return count;
   };
 
-  // Игры которые вёл помощник (с количеством)
+  // РРіСЂС‹ РєРѕС‚РѕСЂС‹Рµ РІС‘Р» РїРѕРјРѕС‰РЅРёРє (СЃ РєРѕР»РёС‡РµСЃС‚РІРѕРј)
   const getHelperGamesWithCount = () => {
     if (!helper) return [];
     const allUsers = JSON.parse(localStorage.getItem("users") || "[]");
@@ -103,7 +113,7 @@ export default function HelperProfilePage() {
     })).filter(item => item.game);
   };
 
-  // Средние изменения по каждой компетенции (по всем ученикам)
+  // РЎСЂРµРґРЅРёРµ РёР·РјРµРЅРµРЅРёСЏ РїРѕ РєР°Р¶РґРѕР№ РєРѕРјРїРµС‚РµРЅС†РёРё (РїРѕ РІСЃРµРј СѓС‡РµРЅРёРєР°Рј)
   const getAverageCompetencyChanges = () => {
     if (!helper) return null;
     const allUsers = JSON.parse(localStorage.getItem("users") || "[]");
@@ -147,7 +157,7 @@ export default function HelperProfilePage() {
     };
   };
 
-  // Есть ли у текущего пользователя активный чат с этим помощником
+  // Р•СЃС‚СЊ Р»Рё Сѓ С‚РµРєСѓС‰РµРіРѕ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ Р°РєС‚РёРІРЅС‹Р№ С‡Р°С‚ СЃ СЌС‚РёРј РїРѕРјРѕС‰РЅРёРєРѕРј
   const getActiveChatSessionId = () => {
     if (!currentUser) return null;
     const sessions = JSON.parse(localStorage.getItem("gameSessions_" + currentUser.id) || "[]");
@@ -167,8 +177,8 @@ export default function HelperProfilePage() {
     return (
       <div className="container mx-auto px-4 py-12 text-center">
         <User className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
-        <h2 className="text-xl font-semibold mb-2">Помощник не найден</h2>
-        <Button onClick={() => router.push("/helpers")}>К списку помощников</Button>
+        <h2 className="text-xl font-semibold mb-2">РџРѕРјРѕС‰РЅРёРє РЅРµ РЅР°Р№РґРµРЅ</h2>
+        <Button onClick={() => router.push("/helpers")}>Рљ СЃРїРёСЃРєСѓ РїРѕРјРѕС‰РЅРёРєРѕРІ</Button>
       </div>
     );
   }
@@ -183,7 +193,7 @@ export default function HelperProfilePage() {
   return (
     <div className="container mx-auto px-4 py-12">
       <div className="max-w-4xl mx-auto space-y-8">
-        {/* Карточка помощника */}
+        {/* РљР°СЂС‚РѕС‡РєР° РїРѕРјРѕС‰РЅРёРєР° */}
         <div className="p-6 rounded-xl border bg-card">
           <div className="flex items-center gap-4 mb-4">
             <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
@@ -203,46 +213,46 @@ export default function HelperProfilePage() {
 
           <div className="flex flex-wrap gap-2 mb-4">
             <span className="px-3 py-1 rounded-full text-sm bg-primary/10 text-primary">
-              Помощник
+              РџРѕРјРѕС‰РЅРёРє
             </span>
-            {helper.mbti_type && (
+            {helper.mbtiType && (
               <span className="px-3 py-1 rounded-full text-sm bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300">
-                {helper.mbti_type}
+                {helper.mbtiType}
               </span>
             )}
           </div>
 
-          {/* Статистика */}
+          {/* РЎС‚Р°С‚РёСЃС‚РёРєР° */}
           <div className="grid grid-cols-3 gap-4 mb-4">
             <div className="p-4 rounded-xl border bg-card text-center">
               <Users className="h-5 w-5 mx-auto mb-1 text-muted-foreground" />
               <p className="text-2xl font-bold">{students.length}</p>
-              <p className="text-xs text-muted-foreground">учеников</p>
+              <p className="text-xs text-muted-foreground">СѓС‡РµРЅРёРєРѕРІ</p>
             </div>
             <div className="p-4 rounded-xl border bg-card text-center">
               <Gamepad2 className="h-5 w-5 mx-auto mb-1 text-muted-foreground" />
               <p className="text-2xl font-bold">{gameCount}</p>
-              <p className="text-xs text-muted-foreground">сессий проведено</p>
+              <p className="text-xs text-muted-foreground">СЃРµСЃСЃРёР№ РїСЂРѕРІРµРґРµРЅРѕ</p>
             </div>
             <div className="p-4 rounded-xl border bg-card text-center">
               <TrendingUp className="h-5 w-5 mx-auto mb-1 text-muted-foreground" />
               <p className="text-2xl font-bold">
                 {compChanges?.averageDelta !== null && compChanges?.averageDelta !== undefined
                   ? (compChanges.averageDelta >= 0 ? `+${compChanges.averageDelta}` : `${compChanges.averageDelta}`)
-                  : "—"}
+                  : "вЂ”"}
               </p>
-              <p className="text-xs text-muted-foreground">средний рост</p>
+              <p className="text-xs text-muted-foreground">СЃСЂРµРґРЅРёР№ СЂРѕСЃС‚</p>
             </div>
           </div>
 
-          {/* Игры которые вёл */}
+          {/* РРіСЂС‹ РєРѕС‚РѕСЂС‹Рµ РІС‘Р» */}
           {gamesWithCount.length > 0 && (
             <div className="mb-4">
-              <h3 className="text-sm font-medium mb-2">Проведённые игры:</h3>
+              <h3 className="text-sm font-medium mb-2">РџСЂРѕРІРµРґС‘РЅРЅС‹Рµ РёРіСЂС‹:</h3>
               <div className="flex flex-wrap gap-2">
                 {gamesWithCount.map(({ game, count }) => (
                   <span key={game!.id} className="px-3 py-1 rounded-full text-sm bg-primary/5 text-primary border">
-                    {game!.title} ×{count}
+                    {game!.title} Г—{count}
                   </span>
                 ))}
               </div>
@@ -250,12 +260,12 @@ export default function HelperProfilePage() {
           )}
         </div>
 
-        {/* Средние изменения по компетенциям */}
+        {/* РЎСЂРµРґРЅРёРµ РёР·РјРµРЅРµРЅРёСЏ РїРѕ РєРѕРјРїРµС‚РµРЅС†РёСЏРј */}
         {compChanges && Object.keys(compChanges.changes).length > 0 && (
           <div className="p-6 rounded-xl border bg-card">
             <div className="flex items-center gap-2 mb-4">
               <TrendingUp className="h-5 w-5 text-blue-500" />
-              <h2 className="text-xl font-semibold">Средний рост по компетенциям</h2>
+              <h2 className="text-xl font-semibold">РЎСЂРµРґРЅРёР№ СЂРѕСЃС‚ РїРѕ РєРѕРјРїРµС‚РµРЅС†РёСЏРј</h2>
             </div>
             <div className="grid grid-cols-2 gap-3">
               {Object.entries(compChanges.changes).map(([key, delta]) => (
@@ -271,12 +281,12 @@ export default function HelperProfilePage() {
           </div>
         )}
 
-        {/* Список учеников (простой) */}
+        {/* РЎРїРёСЃРѕРє СѓС‡РµРЅРёРєРѕРІ (РїСЂРѕСЃС‚РѕР№) */}
         {students.length > 0 && (
           <div className="p-6 rounded-xl border bg-card">
             <div className="flex items-center gap-2 mb-4">
               <Users className="h-5 w-5 text-blue-500" />
-              <h2 className="text-xl font-semibold">Ученики ({students.length})</h2>
+              <h2 className="text-xl font-semibold">РЈС‡РµРЅРёРєРё ({students.length})</h2>
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
               {students.map((student) => (
@@ -285,8 +295,8 @@ export default function HelperProfilePage() {
                   <div className="min-w-0">
                     <p className="font-medium truncate">{student.name}</p>
                     <p className="text-xs text-muted-foreground">
-                      {student.sessionCount} сессий
-                      {student.mbti_type ? ` · ${student.mbti_type}` : ""}
+                      {student.sessionCount} СЃРµСЃСЃРёР№
+                      {student.mbti_type ? ` В· ${student.mbti_type}` : ""}
                     </p>
                   </div>
                 </div>
@@ -295,30 +305,30 @@ export default function HelperProfilePage() {
           </div>
         )}
 
-        {/* Создать сессию / Перейти в чат */}
+        {/* РЎРѕР·РґР°С‚СЊ СЃРµСЃСЃРёСЋ / РџРµСЂРµР№С‚Рё РІ С‡Р°С‚ */}
         {currentUser && activeChatId ? (
           <div className="p-6 rounded-xl border bg-card">
             <div className="flex items-center gap-3 mb-4">
               <MessageCircle className="h-6 w-6 text-green-500" />
               <div>
-                <h2 className="text-xl font-semibold">Активный чат</h2>
+                <h2 className="text-xl font-semibold">РђРєС‚РёРІРЅС‹Р№ С‡Р°С‚</h2>
                 <p className="text-sm text-muted-foreground">
-                  У вас есть активная сессия с {helper.name}
+                  РЈ РІР°СЃ РµСЃС‚СЊ Р°РєС‚РёРІРЅР°СЏ СЃРµСЃСЃРёСЏ СЃ {helper.name}
                 </p>
               </div>
             </div>
             <Button onClick={() => router.push("/chat/" + activeChatId)}>
               <MessageCircle className="h-4 w-4 mr-2" />
-              Перейти в чат
+              РџРµСЂРµР№С‚Рё РІ С‡Р°С‚
             </Button>
           </div>
         ) : currentUser ? (
           <div className="p-6 rounded-xl border bg-card">
-            <h2 className="text-xl font-semibold mb-4">Создать игровую сессию</h2>
+            <h2 className="text-xl font-semibold mb-4">РЎРѕР·РґР°С‚СЊ РёРіСЂРѕРІСѓСЋ СЃРµСЃСЃРёСЋ</h2>
             <p className="text-muted-foreground mb-4">
               {selectedGame
-                ? `Начать игру "${GAMES.find(g => g.id === selectedGame)?.title}" с наставником ${helper.name}`
-                : `Начать сессию с наставником ${helper.name}`}
+                ? `РќР°С‡Р°С‚СЊ РёРіСЂСѓ "${GAMES.find(g => g.id === selectedGame)?.title}" СЃ РЅР°СЃС‚Р°РІРЅРёРєРѕРј ${helper.name}`
+                : `РќР°С‡Р°С‚СЊ СЃРµСЃСЃРёСЋ СЃ РЅР°СЃС‚Р°РІРЅРёРєРѕРј ${helper.name}`}
             </p>
             <div className="flex gap-2">
               <Button
@@ -350,20 +360,21 @@ export default function HelperProfilePage() {
                 }}
               >
                 <MessageCircle className="h-4 w-4 mr-2" />
-                Начать сессию
+                РќР°С‡Р°С‚СЊ СЃРµСЃСЃРёСЋ
               </Button>
               <Button variant="outline" onClick={() => router.push("/games")}>
-                Выбрать другую игру
+                Р’С‹Р±СЂР°С‚СЊ РґСЂСѓРіСѓСЋ РёРіСЂСѓ
               </Button>
             </div>
           </div>
         ) : (
           <div className="text-center p-6 rounded-xl border bg-card">
-            <p className="text-muted-foreground mb-4">Войдите, чтобы создать сессию с наставником</p>
-            <Button onClick={() => router.push("/login")}>Войти</Button>
+            <p className="text-muted-foreground mb-4">Р’РѕР№РґРёС‚Рµ, С‡С‚РѕР±С‹ СЃРѕР·РґР°С‚СЊ СЃРµСЃСЃРёСЋ СЃ РЅР°СЃС‚Р°РІРЅРёРєРѕРј</p>
+            <Button onClick={() => router.push("/login")}>Р’РѕР№С‚Рё</Button>
           </div>
         )}
       </div>
     </div>
   );
 }
+

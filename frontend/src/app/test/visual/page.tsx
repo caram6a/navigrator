@@ -101,7 +101,7 @@ export default function VisualTestPage() {
               <CheckCircle className="h-8 w-8 text-green-600 dark:text-green-300" />
             </div>
             <h1 className="text-3xl font-bold mb-2">Тест завершён!</h1>
-            <p className="text-xl font-bold text-blue-600 dark:text-blue-400 mb-2">{result.profile}</p>
+            <p className="text-xl font-bold text-primary mb-2">{result.profile}</p>
             <p className="text-muted-foreground">80 вопросов · 10 шкал личности</p>
           </div>
 
@@ -128,7 +128,7 @@ export default function VisualTestPage() {
                     <span>{s.rightLabel}</span>
                   </div>
                   <div className="h-2 bg-muted rounded-full overflow-hidden">
-                    <div className="h-full bg-blue-500 transition-all rounded-full"
+                    <div className="h-full bg-primary transition-all rounded-full"
                       style={{ width: data.score + "%" }} />
                   </div>
                   <div className="flex justify-between text-xs text-muted-foreground mt-1">
@@ -160,31 +160,35 @@ export default function VisualTestPage() {
           <Button variant="ghost" onClick={() => router.push("/tests")}><ArrowLeft className="h-4 w-4 mr-2" /> К тестам</Button>
         </div>
         <div className="text-center mb-6">
-          <h1 className="text-2xl font-bold"><Shapes className="h-7 w-7 inline mr-2 text-blue-500" />Визуальный тест личности</h1>
-          <p className="text-sm text-muted-foreground">Выбери фигуру, которая нравится больше</p>
+          <h1 className="text-3xl font-bold"><Shapes className="h-8 w-8 inline mr-2 text-primary" />Визуальный тест личности</h1>
+          <p className="text-sm text-muted-foreground mt-1">80 вопросов — выбери фигуру, которая нравится больше</p>
           {isRetake && <p className="text-xs text-amber-600 dark:text-amber-400">Повторное прохождение</p>}
         </div>
 
-        <div className="flex flex-wrap justify-center gap-1.5 mb-4">
+        <div className="flex flex-wrap justify-center gap-1.5 mb-6">
           {questions.map((q, i) => {
             const isAnswered = !!answers[q.id];
             const isCurrent = i === currentQuestion;
             return (
               <button key={q.id} type="button" onClick={() => setCurrentQuestion(i)}
-                className={"w-7 h-7 rounded-full text-xs font-medium transition-all " + (isCurrent ? "bg-primary text-primary-foreground scale-110 ring-2 ring-primary/30" : isAnswered ? "bg-primary/80 text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/80")}>
+                className={"w-8 h-8 rounded-full text-xs font-medium transition-all " + (isCurrent ? "bg-primary text-primary-foreground scale-110 ring-2 ring-primary/30" : isAnswered ? "bg-primary/80 text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/80")}>
                 {q.id}
               </button>
             );
           })}
         </div>
 
+        <div className="mb-2 flex items-center justify-between text-sm text-muted-foreground">
+          <span>Прогресс</span>
+          <span>{answeredCount}/{questions.length} ({Math.round(answeredCount / questions.length * 100)}%)</span>
+        </div>
         <div className="h-2 bg-muted rounded-full mb-6 overflow-hidden">
-          <div className="h-full bg-blue-500 transition-all duration-300 rounded-full" style={{ width: (answeredCount / questions.length) * 100 + "%" }} />
+          <div className="h-full bg-primary transition-all duration-300 rounded-full" style={{ width: (answeredCount / questions.length) * 100 + "%" }} />
         </div>
 
         {q && (
-          <div className="p-6 rounded-xl border bg-card">
-            <p className="text-sm text-muted-foreground mb-4 text-center">Вопрос {q.id} из {questions.length}</p>
+          <div className="p-8 rounded-xl border bg-card">
+            <p className="text-sm text-muted-foreground mb-6 text-center">Вопрос {q.id} из {questions.length}</p>
             <div className="grid grid-cols-2 gap-6">
               {[
                 { side: "left", shape: q.leftShape, variant: q.leftVariant, color: q.leftColor, fill: q.leftFill, size: q.leftSize, label: 1 },
@@ -195,8 +199,8 @@ export default function VisualTestPage() {
                   onClick={() => handleAnswer(item.label)}
                   className={"group p-6 rounded-xl border-2 transition-all text-center cursor-pointer " +
                     (currentAnswer === item.label
-                      ? "border-blue-500 bg-blue-50 dark:bg-blue-950 shadow-md"
-                      : "border-border hover:border-blue-300 hover:shadow-sm hover:bg-accent/50")}
+                      ? "border-primary bg-primary/5 shadow-md"
+                      : "border-border hover:border-primary hover:shadow-sm hover:bg-accent/50")}
                 >
                   <div className="w-24 h-24 mx-auto mb-3">
                     <FigureSVG
@@ -207,21 +211,23 @@ export default function VisualTestPage() {
                       size={item.size}
                     />
                   </div>
-                  {[1, 2, 3, 4, 5, 6, 7].map(v => (
-                    <span key={v}
-                      className={"inline-block w-3 h-3 rounded-full mx-0.5 transition-all " +
-                        (currentAnswer === v ?
-                          (currentAnswer === item.label ? "bg-blue-500 scale-125" : "bg-primary/30")
-                          : "bg-muted-foreground/20")}
-                    />
-                  ))}
+                  <div className="flex justify-center gap-1">
+                    {[1, 2, 3, 4, 5, 6, 7].map(v => (
+                      <span key={v}
+                        className={"inline-block w-3 h-3 rounded-full transition-all " +
+                          (currentAnswer === v ?
+                            (currentAnswer === item.label ? "bg-primary scale-125" : "bg-primary/30")
+                            : "bg-muted-foreground/20")}
+                      />
+                    ))}
+                  </div>
                 </button>
               ))}
             </div>
           </div>
         )}
 
-        <div className="flex justify-between mt-6">
+        <div className="flex justify-between mt-8">
           <Button variant="outline" onClick={() => setCurrentQuestion(prev => Math.max(0, prev - 1))} disabled={currentQuestion === 0}>
             <ArrowLeft className="h-4 w-4 mr-2" /> Назад
           </Button>
@@ -235,6 +241,7 @@ export default function VisualTestPage() {
             </Button>
           )}
         </div>
+        <p className="text-xs text-center text-muted-foreground mt-4">1-7 — выбор, → — далее, ← — назад</p>
       </div>
     </div>
   );
