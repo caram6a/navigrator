@@ -189,9 +189,27 @@ export default function AdminPage() {
     setNewCompName("");
   };
 
+  const [confirmDeleteComp, setConfirmDeleteComp] = useState<{ id: number; name: string; games: string[] } | null>(null);
+
   const deleteCompetency = (id: number) => {
-    saveCompetencies(getCompetencies().filter(c => c.id !== id));
+    const comp = getCompetencies().find(c => c.id === id);
+    if (!comp) return;
+    const gamesWithComp = getAdminGames()
+      .filter(g => g.competencies.some(c => c.name === comp.name))
+      .map(g => g.title);
+    if (gamesWithComp.length > 0) {
+      setConfirmDeleteComp({ id, name: comp.name, games: gamesWithComp });
+    } else {
+      saveCompetencies(getCompetencies().filter(c => c.id !== id));
+      setCompetencies(getCompetencies());
+    }
+  };
+
+  const confirmDeleteCompAction = () => {
+    if (!confirmDeleteComp) return;
+    saveCompetencies(getCompetencies().filter(c => c.id !== confirmDeleteComp.id));
     setCompetencies(getCompetencies());
+    setConfirmDeleteComp(null);
   };
 
   const saveCompName = (comp: Competency, newName: string) => {
@@ -422,17 +440,17 @@ export default function AdminPage() {
               <h2 className="text-xl font-semibold mb-4 text-yellow-600 dark:text-yellow-400">
                 Заявки на рассмотрение
               </h2>
-              {helpers.filter((u: any) => !u.is_verified).length === 0 ? (
+              {helpers.filter((u: any) => !u.isVerified).length === 0 ? (
                 <p className="text-muted-foreground">Нет новых заявок</p>
               ) : (
                 <div className="space-y-3">
-                  {helpers.filter((u: any) => !u.is_verified).map((u: any) => (
+                  {helpers.filter((u: any) => !u.isVerified).map((u: any) => (
                     <div key={u.id} className="p-4 rounded-xl border-2 border-yellow-200 dark:border-yellow-800 bg-card flex items-center justify-between">
                       <div>
                         <p className="font-medium">{u.name}</p>
                         <p className="text-sm text-muted-foreground">{u.email}</p>
                         <p className="text-xs text-muted-foreground mt-1">
-                          Зарегистрирован: {formatDate(u.created_at)}
+                          Зарегистрирован: {formatDate(u.createdAt)}
                         </p>
                       </div>
                       <div className="flex gap-2">
@@ -463,10 +481,10 @@ export default function AdminPage() {
                         <p className="font-medium">{u.name}</p>
                         <p className="text-sm text-muted-foreground">{u.email}</p>
                         <div className="flex gap-2 mt-1">
-                          <span className={"text-xs px-2 py-0.5 rounded-full " + (u.is_verified
+                          <span className={"text-xs px-2 py-0.5 rounded-full " + (u.isVerified
                             ? "bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300"
                             : "bg-yellow-100 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-300")}>
-                            {u.is_verified ? "Одобрен" : "На проверке"}
+                            {u.isVerified ? "Одобрен" : "На проверке"}
                           </span>
                           {u.mbti_type && (
                             <span className="text-xs px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300">
@@ -476,7 +494,7 @@ export default function AdminPage() {
                         </div>
                       </div>
                       <div className="flex gap-2">
-                        {!u.is_verified && (
+                        {!u.isVerified && (
                           <Button size="sm" variant="outline" onClick={() => toggleVerify(u.id)}>
                             <CheckCircle className="h-4 w-4 mr-1 text-green-500" />
                             Одобрить
@@ -523,7 +541,7 @@ export default function AdminPage() {
                           </span>
                         )}
                         <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
-                          {formatDate(u.created_at)}
+                          {formatDate(u.createdAt)}
                         </span>
                       </div>
                     </div>
@@ -573,12 +591,12 @@ export default function AdminPage() {
                         )}>
                           {roleLabels[u.role] || u.role}
                         </span>
-                        {u.is_verified && u.role === "helper" && (
+                  {u.isVerified && u.role === "helper" && (
                           <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300">
                             Одобрен
                           </span>
                         )}
-                        {!u.is_verified && u.role === "helper" && (
+                        {!u.isVerified && u.role === "helper" && (
                           <span className="text-xs px-2 py-0.5 rounded-full bg-yellow-100 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-300">
                             На проверке
                           </span>
@@ -589,7 +607,7 @@ export default function AdminPage() {
                           </span>
                         )}
                         <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
-                          {formatDate(u.created_at)}
+                          {formatDate(u.createdAt)}
                         </span>
                       </div>
                     </div>
@@ -666,6 +684,33 @@ export default function AdminPage() {
                   )}
                 </div>
               ))}
+            </div>
+          </div>
+        )}
+
+        {/* Диалог подтверждения удаления компетенции */}
+        {confirmDeleteComp && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setConfirmDeleteComp(null)}>
+            <div className="bg-card p-6 rounded-xl border max-w-md w-full mx-4 shadow-2xl" onClick={e => e.stopPropagation()}>
+              <h3 className="text-lg font-semibold mb-2">Удалить компетенцию?</h3>
+              <p className="text-sm text-muted-foreground mb-3">
+                Компетенция <strong>"{confirmDeleteComp.name}"</strong> используется в следующих играх:
+              </p>
+              <ul className="text-sm space-y-1 mb-4">
+                {confirmDeleteComp.games.map((title, i) => (
+                  <li key={i} className="flex items-center gap-2">
+                    <Swords className="h-4 w-4 text-muted-foreground" />
+                    {title}
+                  </li>
+                ))}
+              </ul>
+              <p className="text-sm text-destructive mb-4">
+                После удаления она исчезнет из этих игр.
+              </p>
+              <div className="flex gap-2 justify-end">
+                <Button variant="outline" size="sm" onClick={() => setConfirmDeleteComp(null)}>Отмена</Button>
+                <Button variant="destructive" size="sm" onClick={confirmDeleteCompAction}>Удалить</Button>
+              </div>
             </div>
           </div>
         )}
