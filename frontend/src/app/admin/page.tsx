@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Shield, Users as UsersIcon, BookOpen, Swords, CheckCircle, XCircle, Loader2, Plus, Trash2, Edit3, Save, StickyNote, User, Cloud, RefreshCw } from "lucide-react";
-import { ApiError, notes as notesApi, syncLocalToApi } from "@/lib/api";
+import { ApiError, users as usersApi, notes as notesApi, syncLocalToApi } from "@/lib/api";
 
 type Tab = "helpers" | "players" | "all" | "competencies" | "games" | "notes";
 
@@ -98,8 +98,14 @@ export default function AdminPage() {
       return;
     }
 
-    const all = JSON.parse(localStorage.getItem("users") || "[]");
-    setUserList(all);
+    // Загружаем пользователей из API
+    usersApi.list().then((res: any) => {
+      setUserList(res.users);
+    }).catch(() => {
+      // Fallback на localStorage
+      const all = JSON.parse(localStorage.getItem("users") || "[]");
+      setUserList(all);
+    });
 
     let comps = getCompetencies();
     if (comps.length === 0) {
