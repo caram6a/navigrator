@@ -42,17 +42,19 @@ export default function ProfilePage() {
     try {
       const token = localStorage.getItem("token");
       if (!token) { setLoading(false); return; }
-      const users = JSON.parse(localStorage.getItem("users") || "[]");
-      setAllUsers(users);
-      const found = users.find((u: any) => u.id === token);
-      if (found) { setUser(found); localStorage.setItem("currentUser", JSON.stringify(found)); }
-      const results = JSON.parse(localStorage.getItem("testResults_" + token) || "[]");
+      const currentUser = localStorage.getItem("currentUser");
+      if (!currentUser) { setLoading(false); return; }
+      const parsed = JSON.parse(currentUser);
+      setUser(parsed);
+      const all = JSON.parse(localStorage.getItem("users") || "[]");
+      setAllUsers(all);
+      const results = JSON.parse(localStorage.getItem("testResults_" + parsed.id) || "[]");
       setTestResults(results);
-      const psycho = JSON.parse(localStorage.getItem("psychogeometryResults_" + token) || "[]");
+      const psycho = JSON.parse(localStorage.getItem("psychogeometryResults_" + parsed.id) || "[]");
       setPsychologyResults(psycho);
-      const vis = JSON.parse(localStorage.getItem("visualTestResults_" + token) || "[]");
+      const vis = JSON.parse(localStorage.getItem("visualTestResults_" + parsed.id) || "[]");
       setVisualResults(vis);
-      const sessions = JSON.parse(localStorage.getItem("gameSessions_" + token) || "[]");
+      const sessions = JSON.parse(localStorage.getItem("gameSessions_" + parsed.id) || "[]");
       setGameSessions(sessions);
       setLoading(false);
     } catch (err) {
