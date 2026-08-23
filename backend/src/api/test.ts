@@ -117,7 +117,7 @@ testRouter.post('/submit', authenticate, async (req: AuthRequest, res: Response)
     };
     for (const [dim, val] of Object.entries(dimensionValues)) {
       const existingComp = await prisma.competency.findFirst({
-        where: { name: MBTI- },
+        where: { name: `MBTI-${dim}` },
       });
       if (existingComp) {
         const existing = existingCompetencies.find(uc => uc.competencyId === existingComp.id);
