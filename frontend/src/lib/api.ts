@@ -1,4 +1,5 @@
-const API_URL = (process.env.NEXT_PUBLIC_API_URL || "https://backend-production-05967.up.railway.app").trim();
+// Жёстко закодированный URL бэкенда — не зависит от Vercel env
+const API_URL = "https://backend-production-05967.up.railway.app";
 
 interface ApiOptions {
   method?: string;
