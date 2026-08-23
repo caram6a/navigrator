@@ -3,9 +3,9 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { User, Brain, TrendingUp, ClipboardCheck, Loader2, Gamepad2, Calendar, ArrowUp, ArrowDown, MessageCircle, HelpCircle, Shapes, Eye } from "lucide-react";
+import { User, Brain, TrendingUp, ClipboardCheck, Loader2, Gamepad2, Calendar, ArrowUp, ArrowDown, MessageCircle, HelpCircle, Eye } from "lucide-react";
 import { GAMES } from "@/lib/games-data";
-import { FIGURES } from "@/lib/psychogeometry";
+import { QUESTIONS, MBTI_DESCRIPTIONS } from "@/lib/openjung";
 
 const MBTI_TOOLTIPS: Record<string, Record<string, string>> = {
   E: { label: "Экстраверсия", desc: "Ориентация на внешний мир, общение с людьми, активность в группе" },
@@ -18,12 +18,57 @@ const MBTI_TOOLTIPS: Record<string, Record<string, string>> = {
   P: { label: "Восприятие", desc: "Предпочтение гибкости, спонтанности, открытости новому" },
 };
 
+type DimensionData = {
+  value: string;
+  score: number;
+  E?: number; I?: number; S?: number; N?: number; T?: number; F?: number; J?: number; P?: number;
+};
+
+interface MbtiTestResult {
+  mbtiType: string;
+  dimensions: { EI: DimensionData; SN: DimensionData; TF: DimensionData; JP: DimensionData; };
+  description: { title: string; description: string; strengths: string[]; growth: string[]; };
+  average: number;
+  date: string;
+}
+
+function calculateMBTI(answers: Record<number, number>): MbtiTestResult {
+  let e=0,i=0,s=0,n=0,t=0,f=0,j=0,p=0,sum=0;
+  const processBlock = (ids: number[], left: () => void, right: () => void) => {
+    ids.forEach(q => {
+      const v = answers[q] || 0; sum += v;
+      if (v <= 4) left(); else right();
+    });
+  };
+  processBlock([1,5,9,13,17,21,25,29], () => e++, () => i++);
+  processBlock([2,6,10,14,18,22,26,30], () => s++, () => n++);
+  processBlock([3,7,11,15,19,23,27,31], () => t++, () => f++);
+  processBlock([4,8,12,16,20,24,28,32], () => j++, () => p++);
+
+  const total = sum / 32;
+  const mbti = (e > i ? "E" : "I") + (s > n ? "S" : "N") + (t > f ? "T" : "F") + (j > p ? "J" : "P");
+  const perc = (v: number) => Math.round(v / 8 * 100);
+  const desc = MBTI_DESCRIPTIONS[mbti] || { title: mbti, description: "Описание в разработке", strengths: [], growth: [] };
+
+  return {
+    mbtiType: mbti,
+    dimensions: {
+      EI: { value: e > i ? "E" : "I", score: perc(Math.max(e, i)), E: perc(e), I: perc(i) },
+      SN: { value: s > n ? "S" : "N", score: perc(Math.max(s, n)), S: perc(s), N: perc(n) },
+      TF: { value: t > f ? "T" : "F", score: perc(Math.max(t, f)), T: perc(t), F: perc(f) },
+      JP: { value: j > p ? "J" : "P", score: perc(Math.max(j, p)), J: perc(j), P: perc(p) },
+    },
+    description: { ...desc },
+    average: Math.round(total * 10) / 10,
+    date: new Date().toISOString(),
+  };
+}
+
 export default function ProfilePage() {
   const router = useRouter();
 
   const [user, setUser] = useState<any>(null);
   const [testResults, setTestResults] = useState<any[]>([]);
-  const [psychologyResults, setPsychologyResults] = useState<any[]>([]);
   const [visualResults, setVisualResults] = useState<any[]>([]);
   const [gameSessions, setGameSessions] = useState<any[]>([]);
   const [allUsers, setAllUsers] = useState<any[]>([]);
@@ -31,11 +76,14 @@ export default function ProfilePage() {
   const [error, setError] = useState<string | null>(null);
   const [hoveredScale, setHoveredScale] = useState<string | null>(null);
 
+  // Inline MBTI test state
+  const [showMbtiTest, setShowMbtiTest] = useState(false);
+  const [answers, setAnswers] = useState<Record<number, number>>({});
+  const [currentQuestion, setCurrentQuestion] = useState(0);
+  const [mbtiResult, setMbtiResult] = useState<MbtiTestResult | null>(null);
+
   const roleLabels: Record<string, string> = {
-    admin: "Администратор",
-    leader: "Лидер",
-    helper: "Помощник",
-    player: "Игрок",
+    admin: "Администратор", leader: "Лидер", helper: "Помощник", player: "Игрок",
   };
 
   useEffect(() => {
@@ -50,8 +98,6 @@ export default function ProfilePage() {
       setAllUsers(all);
       const results = JSON.parse(localStorage.getItem("testResults_" + parsed.id) || "[]");
       setTestResults(results);
-      const psycho = JSON.parse(localStorage.getItem("psychogeometryResults_" + parsed.id) || "[]");
-      setPsychologyResults(psycho);
       const vis = JSON.parse(localStorage.getItem("visualTestResults_" + parsed.id) || "[]");
       setVisualResults(vis);
       const sessions = JSON.parse(localStorage.getItem("gameSessions_" + parsed.id) || "[]");
@@ -59,14 +105,48 @@ export default function ProfilePage() {
       setLoading(false);
     } catch (err) {
       console.error("Profile load error:", err);
-      setError("Ошибка загрузки профиля.");
-      setLoading(false);
+      setError("Ошибка загрузки профиля."); setLoading(false);
     }
   }, []);
 
   const getHelperName = (helperId: string) => {
     const h = allUsers.find((u: any) => u.id === helperId);
     return h?.name || "Наставник";
+  };
+
+  const startMbtiTest = () => {
+    setAnswers({});
+    setCurrentQuestion(0);
+    setMbtiResult(null);
+    setShowMbtiTest(true);
+  };
+
+  const answerQuestion = (value: number) => {
+    const qNum = currentQuestion + 1;
+    const newAnswers = { ...answers, [qNum]: value };
+    setAnswers(newAnswers);
+    if (currentQuestion < 31) {
+      setCurrentQuestion(currentQuestion + 1);
+    } else {
+      // Finished all 32 questions
+      const result = calculateMBTI(newAnswers);
+      setMbtiResult(result);
+      // Save to localStorage
+      const userId = user?.id;
+      if (userId) {
+        const existing = JSON.parse(localStorage.getItem("testResults_" + userId) || "[]");
+        existing.push(result);
+        localStorage.setItem("testResults_" + userId, JSON.stringify(existing));
+        setTestResults(existing);
+      }
+    }
+  };
+
+  const finishMbtiTest = () => {
+    setShowMbtiTest(false);
+    setMbtiResult(null);
+    setCurrentQuestion(0);
+    setAnswers({});
   };
 
   if (loading) return (<div className="container mx-auto px-4 py-12 text-center"><Loader2 className="h-8 w-8 animate-spin mx-auto text-muted-foreground" /></div>);
@@ -76,7 +156,6 @@ export default function ProfilePage() {
   const lastResult = testResults.length > 0 ? testResults[testResults.length - 1] : null;
   const prevResult = testResults.length > 1 ? testResults[testResults.length - 2] : null;
   const activeSessions = gameSessions.filter((s: any) => s.status === "pending" && s.helperId);
-  const lastPsycho = psychologyResults.length > 0 ? psychologyResults[psychologyResults.length - 1] : null;
   const lastVisual = visualResults.length > 0 ? visualResults[visualResults.length - 1] : null;
 
   const getDelta = (key: string) => {
@@ -97,11 +176,84 @@ export default function ProfilePage() {
   const getGameTitle = (id: number) => GAMES.find(g => g.id === id)?.title || "Неизвестная игра";
 
   const scaleNames: Record<string, string> = {
-    EI: "Экстраверсия — Интроверсия",
-    SN: "Интуиция — Сенсорика",
-    TF: "Мышление — Чувство",
-    JP: "Суждение — Восприятие",
+    EI: "Экстраверсия — Интроверсия", SN: "Интуиция — Сенсорика", TF: "Мышление — Чувство", JP: "Суждение — Восприятие",
   };
+
+  // Если показываем MBTI тест
+  if (showMbtiTest) {
+    const q = QUESTIONS[currentQuestion];
+    if (mbtiResult) {
+      return (
+        <div className="container mx-auto px-4 py-12">
+          <div className="max-w-2xl mx-auto p-6 rounded-xl border bg-card text-center">
+            <Brain className="h-12 w-12 mx-auto mb-4 text-purple-500" />
+            <h2 className="text-2xl font-bold mb-2">Ваш тип личности</h2>
+            <p className="text-4xl font-bold text-purple-600 dark:text-purple-400 mb-2">{mbtiResult.mbtiType}</p>
+            <p className="text-lg mb-4">{mbtiResult.description.title}</p>
+            <p className="text-sm text-muted-foreground mb-6 whitespace-pre-line">{mbtiResult.description.description}</p>
+            {mbtiResult.description.strengths.length > 0 && (
+              <div className="text-left mb-4">
+                <p className="font-semibold text-green-600 dark:text-green-400 mb-2">Сильные стороны:</p>
+                <ul className="space-y-1">{mbtiResult.description.strengths.map((s,i) => <li key={i} className="text-sm text-muted-foreground">• {s}</li>)}</ul>
+              </div>
+            )}
+            {mbtiResult.description.growth.length > 0 && (
+              <div className="text-left mb-6">
+                <p className="font-semibold text-amber-600 dark:text-amber-400 mb-2">Зоны роста:</p>
+                <ul className="space-y-1">{mbtiResult.description.growth.map((s,i) => <li key={i} className="text-sm text-muted-foreground">• {s}</li>)}</ul>
+              </div>
+            )}
+            <Button onClick={finishMbtiTest}>Вернуться в профиль</Button>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="container mx-auto px-4 py-12">
+        <div className="max-w-2xl mx-auto">
+          <div className="mb-6">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm text-muted-foreground">Вопрос {currentQuestion + 1} из 32</span>
+              <span className="text-sm text-muted-foreground">{Math.round((currentQuestion + 1) / 32 * 100)}%</span>
+            </div>
+            <div className="w-full bg-muted rounded-full h-2">
+              <div className="bg-primary rounded-full h-2 transition-all" style={{ width: `${(currentQuestion + 1) / 32 * 100}%` }} />
+            </div>
+          </div>
+
+          {q && (
+            <div className="p-8 rounded-xl border bg-card">
+              <p className="text-lg mb-6 text-center">{q.text}</p>
+              <div className="flex items-center justify-between gap-6">
+                <div className="text-right flex-1 max-w-[200px]">
+                  <p className="text-sm font-medium text-muted-foreground">{q.left}</p>
+                </div>
+                <div className="flex gap-1 items-center">
+                  {[1,2,3,4,5,6,7].map(v => (
+                    <button
+                      key={v}
+                      onClick={() => answerQuestion(v)}
+                      className={`w-10 h-10 rounded-full text-sm font-medium border transition-all hover:scale-110 ${
+                        answers[currentQuestion + 1] === v
+                          ? "bg-primary text-primary-foreground border-primary shadow-md"
+                          : "bg-card text-foreground border-border hover:border-primary hover:bg-accent"
+                      }`}
+                    >
+                      {v}
+                    </button>
+                  ))}
+                </div>
+                <div className="flex-1 max-w-[200px]">
+                  <p className="text-sm font-medium text-muted-foreground">{q.right}</p>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="container mx-auto px-4 py-12">
@@ -183,46 +335,6 @@ export default function ProfilePage() {
           </div>
         )}
 
-        {/* Психогеометрический тест */}
-        {lastPsycho ? (
-          <div className="p-6 rounded-xl border bg-card">
-            <div className="flex items-center gap-2 mb-4">
-              <Shapes className="h-5 w-5 text-blue-500" />
-              <h2 className="text-xl font-semibold">Психогеометрический тест</h2>
-            </div>
-            <div className={`p-6 rounded-xl border-2 ${lastPsycho.figure?.bgColor || "bg-card"}`}>
-              <div className="flex items-center gap-4 mb-3">
-                <span className={`text-5xl ${lastPsycho.figure?.color || "text-blue-500"}`}>
-                  {lastPsycho.figure?.symbol || "○"}
-                </span>
-                <div>
-                  <p className={`text-xl font-bold ${lastPsycho.figure?.color || "text-blue-500"}`}>
-                    {lastPsycho.figure?.name || "—"}
-                  </p>
-                  <p className="text-sm text-muted-foreground">{lastPsycho.figure?.title || ""}</p>
-                </div>
-              </div>
-              <p className="text-sm text-muted-foreground leading-relaxed mb-3">{lastPsycho.figure?.description}</p>
-              {lastPsycho.figure?.mbtiCorrelation && (
-                <p className="text-xs text-muted-foreground italic">Связь с MBTI: {lastPsycho.figure.mbtiCorrelation}</p>
-              )}
-            </div>
-            <div className="mt-3 flex items-center justify-between">
-              <span className="text-xs text-muted-foreground">{formatDate(lastPsycho.date)}</span>
-              <Button variant="outline" size="sm" onClick={() => router.push("/test/psychogeometry")}>Пройти заново</Button>
-            </div>
-          </div>
-        ) : (
-          <div className="p-6 rounded-xl border bg-card">
-            <div className="flex items-center gap-2 mb-2">
-              <Shapes className="h-5 w-5 text-blue-500" />
-              <h2 className="text-xl font-semibold">Психогеометрический тест</h2>
-            </div>
-            <p className="text-sm text-muted-foreground mb-4">Ещё не пройден. Узнай свой тип личности по геометрическим фигурам.</p>
-            <Button variant="outline" size="sm" onClick={() => router.push("/test/psychogeometry")}>Пройти тест</Button>
-          </div>
-        )}
-
         {/* MBTI Результаты */}
         {lastResult && (
           <div className="p-6 rounded-xl border bg-card">
@@ -268,11 +380,11 @@ export default function ProfilePage() {
                 {["EI", "SN", "TF", "JP"].map(key => {
                   const dim = lastResult.dimensions[key];
                   if (!dim) return null;
-                  let first = 0, second = 0, firstLabel = "", secondLabel = "";
-                  if (dim.E !== undefined) { first = dim.E; second = dim.I || 0; firstLabel = "E"; secondLabel = "I"; }
-                  else if (dim.S !== undefined) { first = dim.S; second = dim.N || 0; firstLabel = "S"; secondLabel = "N"; }
-                  else if (dim.T !== undefined) { first = dim.T; second = dim.F || 0; firstLabel = "T"; secondLabel = "F"; }
-                  else { first = dim.J || 0; second = dim.P || 0; firstLabel = "J"; secondLabel = "P"; }
+                  let first=0,second=0,firstLabel="",secondLabel="";
+                  if (dim.E !== undefined) { first=dim.E; second=dim.I||0; firstLabel="E"; secondLabel="I"; }
+                  else if (dim.S !== undefined) { first=dim.S; second=dim.N||0; firstLabel="S"; secondLabel="N"; }
+                  else if (dim.T !== undefined) { first=dim.T; second=dim.F||0; firstLabel="T"; secondLabel="F"; }
+                  else { first=dim.J||0; second=dim.P||0; firstLabel="J"; secondLabel="P"; }
 
                   return (
                     <div key={key} className="p-4 rounded-xl border bg-card relative">
@@ -311,7 +423,7 @@ export default function ProfilePage() {
             )}
 
             <div className="mt-4 flex gap-2">
-              <Button variant="outline" size="sm" onClick={() => router.push("/test/mbti")}>Пройти заново</Button>
+              <Button variant="outline" size="sm" onClick={startMbtiTest}>Пройти заново</Button>
               <Button variant="ghost" size="sm" onClick={() => router.push("/tests")}>Все тесты</Button>
             </div>
           </div>
@@ -322,7 +434,7 @@ export default function ProfilePage() {
             <Brain className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
             <h2 className="text-xl font-semibold mb-2">Нет результатов MBTI</h2>
             <p className="text-muted-foreground mb-4">Пройдите MBTI-тест, чтобы узнать свой тип личности</p>
-            <Button onClick={() => router.push("/test/mbti")}>Пройти MBTI-тест</Button>
+            <Button onClick={startMbtiTest}>Пройти MBTI-тест</Button>
           </div>
         )}
 
