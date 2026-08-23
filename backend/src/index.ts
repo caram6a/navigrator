@@ -13,7 +13,12 @@ const app = express();
 const PORT = process.env.PORT || 4000;
 
 app.use(cors({
-  origin: ["http://localhost:3000", "http://localhost:3001"],
+  origin: [
+    "http://localhost:3000",
+    "http://localhost:3001",
+    "https://navigrator.vercel.app",
+    "https://navigrator-git-master-caram6as-projects.vercel.app",
+  ],
   credentials: true,
 }));
 app.use(express.json());
