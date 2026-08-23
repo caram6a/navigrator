@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { User, Star, Gamepad2, Users, TrendingUp, Calendar, ArrowUp, ArrowDown, Loader2 } from "lucide-react";
+import { User, Star, Gamepad2, Users, TrendingUp, Calendar, ArrowUp, ArrowDown, Loader2, ChevronDown, ChevronUp, Brain } from "lucide-react";
 import { GAMES } from "@/lib/games-data";
 
 export default function HelperProfilePage() {
@@ -13,6 +13,7 @@ export default function HelperProfilePage() {
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [selectedGame, setSelectedGame] = useState<number | null>(null);
+  const [expandedStudent, setExpandedStudent] = useState<string | null>(null);
 
   useEffect(() => {
     const users = JSON.parse(localStorage.getItem("users") || "[]");
@@ -41,8 +42,31 @@ export default function HelperProfilePage() {
     return Math.min(5, Math.round((completed.length / sessions.length) * 5));
   };
 
-  // Сколько учеников
+  // Ученики помощника (уникальные)
   const getHelperStudents = () => {
+    if (!helper) return [];
+    const allUsers = JSON.parse(localStorage.getItem("users") || "[]");
+    const studentIds = new Set<string>();
+    const students: any[] = [];
+    
+    allUsers.forEach((u: any) => {
+      const sessions = JSON.parse(localStorage.getItem("gameSessions_" + u.id) || "[]");
+      const helperSessions = sessions.filter((s: any) => s.helperId === helper.id);
+      if (helperSessions.length > 0 && !studentIds.has(u.id)) {
+        studentIds.add(u.id);
+        students.push({
+          ...u,
+          sessionCount: helperSessions.length,
+          sessions: helperSessions,
+        });
+      }
+    });
+    
+    return students;
+  };
+
+  // Сколько раз помощник вёл игры (сумма всех сессий)
+  const getHelperGameCount = () => {
     if (!helper) return 0;
     const allUsers = JSON.parse(localStorage.getItem("users") || "[]");
     let count = 0;
@@ -53,18 +77,28 @@ export default function HelperProfilePage() {
     return count;
   };
 
-  // Игры которые ведёт
-  const getHelperGames = () => {
+  // Игры которые вёл помощник (с количеством)
+  const getHelperGamesWithCount = () => {
     if (!helper) return [];
-    const sessions = JSON.parse(localStorage.getItem("gameSessions_" + helper.id) || "[]");
-    const gameIds = new Set<number>();
-    sessions.forEach((s: any) => {
-      if (s.games) Object.keys(s.games).forEach((gid: string) => gameIds.add(parseInt(gid)));
+    const allUsers = JSON.parse(localStorage.getItem("users") || "[]");
+    const gameCounts: Record<number, number> = {};
+    
+    allUsers.forEach((u: any) => {
+      const sessions = JSON.parse(localStorage.getItem("gameSessions_" + u.id) || "[]");
+      sessions.filter((s: any) => s.helperId === helper.id).forEach((s: any) => {
+        if (s.gameId) {
+          gameCounts[s.gameId] = (gameCounts[s.gameId] || 0) + 1;
+        }
+      });
     });
-    return GAMES.filter(g => gameIds.has(g.id));
+    
+    return Object.entries(gameCounts).map(([id, count]) => ({
+      game: GAMES.find(g => g.id === parseInt(id)),
+      count,
+    })).filter(item => item.game);
   };
 
-  // Средний прогресс учеников
+  // Средний прогресс учеников (по среднему баллу)
   const getAverageProgress = () => {
     if (!helper) return null;
     const allUsers = JSON.parse(localStorage.getItem("users") || "[]");
@@ -83,6 +117,28 @@ export default function HelperProfilePage() {
     });
     if (count === 0) return null;
     return Math.round((totalDelta / count) * 10) / 10;
+  };
+
+  // Изменения по компетенциям для ученика
+  const getStudentCompetencyChanges = (studentId: string) => {
+    const results = JSON.parse(localStorage.getItem("testResults_" + studentId) || "[]");
+    if (results.length < 2) return null;
+    const last = results[results.length - 1];
+    const prev = results[results.length - 2];
+    if (!last || !prev || !last.dimensions || !prev.dimensions) return null;
+    
+    const changes: Record<string, number> = {};
+    ["EI", "SN", "TF", "JP"].forEach(key => {
+      const lastScore = last.dimensions[key]?.score || 0;
+      const prevScore = prev.dimensions[key]?.score || 0;
+      changes[key] = lastScore - prevScore;
+    });
+    return {
+      averageDelta: Math.round((last.average - prev.average) * 10) / 10,
+      changes,
+      lastResult: last,
+      prevResult: prev,
+    };
   };
 
   if (loading) {
@@ -105,8 +161,16 @@ export default function HelperProfilePage() {
 
   const rating = getHelperRating();
   const students = getHelperStudents();
-  const games = getHelperGames();
+  const gamesWithCount = getHelperGamesWithCount();
+  const gameCount = getHelperGameCount();
   const avgProgress = getAverageProgress();
+
+  const scaleNames: Record<string, string> = {
+    EI: "Экстраверсия — Интроверсия",
+    SN: "Интуиция — Сенсорика",
+    TF: "Мышление — Чувство",
+    JP: "Суждение — Восприятие",
+  };
 
   return (
     <div className="container mx-auto px-4 py-12">
@@ -144,35 +208,132 @@ export default function HelperProfilePage() {
           <div className="grid grid-cols-3 gap-4 mb-4">
             <div className="p-4 rounded-xl border bg-card text-center">
               <Users className="h-5 w-5 mx-auto mb-1 text-muted-foreground" />
-              <p className="text-2xl font-bold">{students}</p>
+              <p className="text-2xl font-bold">{students.length}</p>
               <p className="text-xs text-muted-foreground">учеников</p>
             </div>
             <div className="p-4 rounded-xl border bg-card text-center">
               <Gamepad2 className="h-5 w-5 mx-auto mb-1 text-muted-foreground" />
-              <p className="text-2xl font-bold">{games.length}</p>
-              <p className="text-xs text-muted-foreground">игр ведёт</p>
+              <p className="text-2xl font-bold">{gameCount}</p>
+              <p className="text-xs text-muted-foreground">сессий проведено</p>
             </div>
             <div className="p-4 rounded-xl border bg-card text-center">
               <TrendingUp className="h-5 w-5 mx-auto mb-1 text-muted-foreground" />
-              <p className="text-2xl font-bold">{avgProgress !== null ? `+${avgProgress}` : "—"}</p>
+              <p className="text-2xl font-bold">
+                {avgProgress !== null 
+                  ? (avgProgress >= 0 ? `+${avgProgress}` : `${avgProgress}`)
+                  : "—"}
+              </p>
               <p className="text-xs text-muted-foreground">средний рост</p>
             </div>
           </div>
 
-          {/* Игры которые ведёт */}
-          {games.length > 0 && (
+          {/* Игры которые вёл */}
+          {gamesWithCount.length > 0 && (
             <div className="mb-4">
-              <h3 className="text-sm font-medium mb-2">Ведёт игры:</h3>
+              <h3 className="text-sm font-medium mb-2">Проведённые игры:</h3>
               <div className="flex flex-wrap gap-2">
-                {games.map(g => (
-                  <span key={g.id} className="px-3 py-1 rounded-full text-sm bg-primary/5 text-primary border">
-                    {g.title}
+                {gamesWithCount.map(({ game, count }) => (
+                  <span key={game!.id} className="px-3 py-1 rounded-full text-sm bg-primary/5 text-primary border">
+                    {game!.title} ×{count}
                   </span>
                 ))}
               </div>
             </div>
           )}
         </div>
+
+        {/* Список учеников */}
+        {students.length > 0 && (
+          <div className="p-6 rounded-xl border bg-card">
+            <div className="flex items-center gap-2 mb-4">
+              <Users className="h-5 w-5 text-blue-500" />
+              <h2 className="text-xl font-semibold">Ученики ({students.length})</h2>
+            </div>
+            <div className="space-y-3">
+              {students.map((student) => {
+                const compChanges = getStudentCompetencyChanges(student.id);
+                const isExpanded = expandedStudent === student.id;
+                return (
+                  <div key={student.id} className="rounded-lg border overflow-hidden">
+                    <button
+                      onClick={() => setExpandedStudent(isExpanded ? null : student.id)}
+                      className="w-full flex items-center justify-between p-3 hover:bg-muted/50 transition-colors text-left"
+                    >
+                      <div className="flex items-center gap-3">
+                        <User className="h-8 w-8 p-1.5 rounded-full bg-primary/10 text-primary" />
+                        <div>
+                          <p className="font-medium">{student.name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {student.sessionCount} сессий
+                            {student.mbti_type ? ` | ${student.mbti_type}` : ""}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        {compChanges && (
+                          <span className={`text-sm font-medium ${compChanges.averageDelta >= 0 ? "text-green-500" : "text-red-500"}`}>
+                            {compChanges.averageDelta >= 0 ? "+" : ""}{compChanges.averageDelta}
+                          </span>
+                        )}
+                        {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                      </div>
+                    </button>
+                    
+                    {isExpanded && (
+                      <div className="px-3 pb-3 space-y-3">
+                        {/* Сессии ученика с этим помощником */}
+                        <div>
+                          <p className="text-xs font-medium text-muted-foreground mb-1">Сессии:</p>
+                          {student.sessions.map((s: any, i: number) => (
+                            <div key={i} className="flex items-center justify-between text-sm py-1">
+                              <span>
+                                {s.gameId ? GAMES.find(g => g.id === s.gameId)?.title || "Без игры" : "Без игры"}
+                              </span>
+                              <span className="text-muted-foreground">
+                                {s.date ? new Date(s.date).toLocaleDateString("ru-RU") : ""}
+                                {" | "}
+                                {s.status === "completed" ? "Завершена" : "Ожидает"}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Изменения по компетенциям */}
+                        {compChanges && (
+                          <div>
+                            <p className="text-xs font-medium text-muted-foreground mb-1">Изменения после последней игры:</p>
+                            <div className="grid grid-cols-2 gap-2">
+                              {Object.entries(compChanges.changes).map(([key, delta]) => (
+                                <div key={key} className="flex items-center justify-between text-sm p-2 rounded bg-muted/50">
+                                  <span className="text-xs">{scaleNames[key]}</span>
+                                  <span className={`font-medium ${delta >= 0 ? "text-green-500" : "text-red-500"}`}>
+                                    {delta >= 0 ? <ArrowUp className="h-3 w-3 inline" /> : <ArrowDown className="h-3 w-3 inline" />}
+                                    {delta >= 0 ? "+" : ""}{delta}%
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                            <div className="flex items-center justify-between text-sm p-2 rounded bg-muted/50 mt-1">
+                              <span className="text-xs">Средний балл</span>
+                              <span className={`font-medium ${compChanges.averageDelta >= 0 ? "text-green-500" : "text-red-500"}`}>
+                                {compChanges.averageDelta >= 0 ? <ArrowUp className="h-3 w-3 inline" /> : <ArrowDown className="h-3 w-3 inline" />}
+                                {compChanges.averageDelta >= 0 ? "+" : ""}{compChanges.averageDelta}
+                              </span>
+                            </div>
+                          </div>
+                        )}
+
+                        {!compChanges && (
+                          <p className="text-xs text-muted-foreground">Нет данных для сравнения (нужно минимум 2 теста)</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Создать сессию */}
         {currentUser && (
@@ -186,6 +347,17 @@ export default function HelperProfilePage() {
             <div className="flex gap-2">
               <Button
                 onClick={() => {
+                  // Проверяем, есть ли уже такая сессия
+                  const sessions = JSON.parse(localStorage.getItem("gameSessions_" + currentUser.id) || "[]");
+                  const exists = sessions.some(
+                    (s: any) => s.helperId === helper.id && s.gameId === selectedGame && s.status === "pending"
+                  );
+                  
+                  if (exists) {
+                    router.push("/profile");
+                    return;
+                  }
+
                   const session = {
                     id: Date.now().toString(),
                     playerId: currentUser.id,
@@ -194,7 +366,6 @@ export default function HelperProfilePage() {
                     status: "pending",
                     date: new Date().toISOString(),
                   };
-                  const sessions = JSON.parse(localStorage.getItem("gameSessions_" + currentUser.id) || "[]");
                   sessions.push(session);
                   localStorage.setItem("gameSessions_" + currentUser.id, JSON.stringify(sessions));
                   router.push("/profile");
