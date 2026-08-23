@@ -329,7 +329,7 @@ export default function ProfilePage() {
             <Eye className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
             <h2 className="text-xl font-semibold mb-2">Нет результатов визуального теста</h2>
             <p className="text-muted-foreground mb-4">Пройдите визуальный тест, чтобы узнать свой многомерный профиль личности по 10 шкалам</p>
-            <Button variant="outline" size="sm" onClick={() => router.push("/test/visual")}>Пройти тест</Button>
+            <Button onClick={() => router.push("/test/visual")}>Пройти тест</Button>
           </div>
         )}
 
