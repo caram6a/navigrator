@@ -16,7 +16,7 @@ function FigureSVG({ shape, variant, color, fill, size }: {
   const def = FIGURE_DEFS[shape];
   if (!def) return null;
   const v = def.variants[variant] || def.variants[0];
-  // Увеличиваем viewBox, чтобы фигура не обрезалась при size=1.2
+  // viewBox увеличен для предотвращения обрезания, чтобы фигура не обрезалась при size=1.2
   const vbSize = 120;
   const scale = size * 0.8;
   const cx = 60;
