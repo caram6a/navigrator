@@ -126,8 +126,12 @@ export default function ProfilePage() {
             localStorage.setItem("visualTestResults_" + parsed.id, JSON.stringify(visualArr));
           }
         }
-      }).catch(() => {});
-      setLoading(false);
+      }).catch((err) => {
+        console.error("Server sync failed (expected on first load):", err);
+        // Use local data as fallback (already loaded above)
+      }).finally(() => {
+        setLoading(false);
+      });
     } catch (err) {
       console.error("Profile load error:", err);
       setError("Ошибка загрузки профиля."); setLoading(false);
@@ -140,10 +144,7 @@ export default function ProfilePage() {
   };
 
   const startMbtiTest = () => {
-    setAnswers({});
-    setCurrentQuestion(0);
-    setMbtiResult(null);
-    setShowMbtiTest(true);
+    router.push("/test/mbti");
   };
 
   const answerQuestion = (value: number) => {
@@ -170,10 +171,7 @@ export default function ProfilePage() {
   };
 
   const finishMbtiTest = () => {
-    setShowMbtiTest(false);
-    setMbtiResult(null);
-    setCurrentQuestion(0);
-    setAnswers({});
+    router.push("/test/mbti");
   };
 
   if (loading) return (<div className="container mx-auto px-4 py-12 text-center"><Loader2 className="h-8 w-8 animate-spin mx-auto text-muted-foreground" /></div>);
@@ -206,80 +204,10 @@ export default function ProfilePage() {
     EI: "Экстраверсия — Интроверсия", SN: "Интуиция — Сенсорика", TF: "Мышление — Чувство", JP: "Суждение — Восприятие",
   };
 
-  // Если показываем MBTI тест
+  // Если показываем MBTI тест — редирект
   if (showMbtiTest) {
-    const q = QUESTIONS[currentQuestion];
-    if (mbtiResult) {
-      return (
-        <div className="container mx-auto px-4 py-12">
-          <div className="max-w-2xl mx-auto p-6 rounded-xl border bg-card text-center">
-            <Brain className="h-12 w-12 mx-auto mb-4 text-purple-500" />
-            <h2 className="text-2xl font-bold mb-2">Ваш тип личности</h2>
-            <p className="text-4xl font-bold text-purple-600 dark:text-purple-400 mb-2">{mbtiResult.mbtiType}</p>
-            <p className="text-lg mb-4">{mbtiResult.description.title}</p>
-            <p className="text-sm text-muted-foreground mb-6 whitespace-pre-line">{mbtiResult.description.description}</p>
-            {mbtiResult.description.strengths.length > 0 && (
-              <div className="text-left mb-4">
-                <p className="font-semibold text-green-600 dark:text-green-400 mb-2">Сильные стороны:</p>
-                <ul className="space-y-1">{mbtiResult.description.strengths.map((s,i) => <li key={i} className="text-sm text-muted-foreground">• {s}</li>)}</ul>
-              </div>
-            )}
-            {mbtiResult.description.growth.length > 0 && (
-              <div className="text-left mb-6">
-                <p className="font-semibold text-amber-600 dark:text-amber-400 mb-2">Зоны роста:</p>
-                <ul className="space-y-1">{mbtiResult.description.growth.map((s,i) => <li key={i} className="text-sm text-muted-foreground">• {s}</li>)}</ul>
-              </div>
-            )}
-            <Button onClick={finishMbtiTest}>Вернуться в профиль</Button>
-          </div>
-        </div>
-      );
-    }
-
-    return (
-      <div className="container mx-auto px-4 py-12">
-        <div className="max-w-2xl mx-auto">
-          <div className="mb-6">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm text-muted-foreground">Вопрос {currentQuestion + 1} из 32</span>
-              <span className="text-sm text-muted-foreground">{Math.round((currentQuestion + 1) / 32 * 100)}%</span>
-            </div>
-            <div className="w-full bg-muted rounded-full h-2">
-              <div className="bg-primary rounded-full h-2 transition-all" style={{ width: `${(currentQuestion + 1) / 32 * 100}%` }} />
-            </div>
-          </div>
-
-          {q && (
-            <div className="p-8 rounded-xl border bg-card">
-              <p className="text-lg mb-6 text-center">{q.text}</p>
-              <div className="flex items-center justify-between gap-6">
-                <div className="text-right flex-1 max-w-[200px]">
-                  <p className="text-sm font-medium text-muted-foreground">{q.left}</p>
-                </div>
-                <div className="flex gap-1 items-center">
-                  {[1,2,3,4,5,6,7].map(v => (
-                    <button
-                      key={v}
-                      onClick={() => answerQuestion(v)}
-                      className={`w-10 h-10 rounded-full text-sm font-medium border transition-all hover:scale-110 ${
-                        answers[currentQuestion + 1] === v
-                          ? "bg-primary text-primary-foreground border-primary shadow-md"
-                          : "bg-card text-foreground border-border hover:border-primary hover:bg-accent"
-                      }`}
-                    >
-                      {v}
-                    </button>
-                  ))}
-                </div>
-                <div className="flex-1 max-w-[200px]">
-                  <p className="text-sm font-medium text-muted-foreground">{q.right}</p>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-    );
+    router.push("/test/mbti");
+    return null;
   }
 
   return (

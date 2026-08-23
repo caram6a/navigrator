@@ -211,16 +211,6 @@ export default function VisualTestPage() {
                       size={item.size}
                     />
                   </div>
-                  <div className="flex justify-center gap-1">
-                    {[1, 2, 3, 4, 5, 6, 7].map(v => (
-                      <span key={v}
-                        className={"inline-block w-3 h-3 rounded-full transition-all " +
-                          (currentAnswer === v ?
-                            (currentAnswer === item.label ? "bg-primary scale-125" : "bg-primary/30")
-                            : "bg-muted-foreground/20")}
-                      />
-                    ))}
-                  </div>
                 </button>
               ))}
             </div>
@@ -241,7 +231,7 @@ export default function VisualTestPage() {
             </Button>
           )}
         </div>
-        <p className="text-xs text-center text-muted-foreground mt-4">1-7 — выбор, → — далее, ← — назад</p>
+        
       </div>
     </div>
   );

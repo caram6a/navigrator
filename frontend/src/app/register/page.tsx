@@ -54,6 +54,18 @@ export default function RegisterPage() {
       }
 
       window.dispatchEvent(new Event("auth-change"));
+      
+      // Sync test results from server (if any exist)
+      try {
+        const syncRes = await testApi.getResults().catch(() => null);
+        if (syncRes && syncRes.results && syncRes.results.length > 0) {
+          const mbtiArr = syncRes.results.filter((r: any) => r.testType === "mbti").map((r: any) => r.result);
+          const visualArr = syncRes.results.filter((r: any) => r.testType === "visual").map((r: any) => r.result);
+          if (mbtiArr.length > 0) localStorage.setItem("testResults_" + data.user.id, JSON.stringify(mbtiArr));
+          if (visualArr.length > 0) localStorage.setItem("visualTestResults_" + data.user.id, JSON.stringify(visualArr));
+        }
+      } catch {}
+      
       setSuccess(true);
       setTimeout(() => router.push("/test"), 1500);
     } catch (err: any) {
