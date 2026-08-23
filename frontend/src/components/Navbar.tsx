@@ -51,7 +51,7 @@ export function Navbar() {
   };
 
   const links = [
-    { href: "/test", label: "Тест", icon: Brain },
+    { href: "/tests", label: "Тесты", icon: Brain },
     { href: "/games", label: "Игры", icon: Gamepad2 },
   ];
 

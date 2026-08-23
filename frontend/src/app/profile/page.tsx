@@ -3,10 +3,10 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { User, Brain, TrendingUp, ClipboardCheck, Loader2, Gamepad2, Calendar, ArrowUp, ArrowDown, MessageCircle, HelpCircle } from "lucide-react";
+import { User, Brain, TrendingUp, ClipboardCheck, Loader2, Gamepad2, Calendar, ArrowUp, ArrowDown, MessageCircle, HelpCircle, Shapes } from "lucide-react";
 import { GAMES } from "@/lib/games-data";
+import { FIGURES } from "@/lib/psychogeometry";
 
-// Пояснения к шкалам MBTI
 const MBTI_TOOLTIPS: Record<string, Record<string, string>> = {
   E: { label: "Экстраверсия", desc: "Ориентация на внешний мир, общение с людьми, активность в группе" },
   I: { label: "Интроверсия", desc: "Ориентация на внутренний мир, размышления, предпочтение уединения" },
@@ -23,6 +23,7 @@ export default function ProfilePage() {
 
   const [user, setUser] = useState<any>(null);
   const [testResults, setTestResults] = useState<any[]>([]);
+  const [psychologyResults, setPsychologyResults] = useState<any[]>([]);
   const [gameSessions, setGameSessions] = useState<any[]>([]);
   const [allUsers, setAllUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -46,12 +47,14 @@ export default function ProfilePage() {
       if (found) { setUser(found); localStorage.setItem("currentUser", JSON.stringify(found)); }
       const results = JSON.parse(localStorage.getItem("testResults_" + token) || "[]");
       setTestResults(results);
+      const psycho = JSON.parse(localStorage.getItem("psychogeometryResults_" + token) || "[]");
+      setPsychologyResults(psycho);
       const sessions = JSON.parse(localStorage.getItem("gameSessions_" + token) || "[]");
       setGameSessions(sessions);
       setLoading(false);
     } catch (err) {
       console.error("Profile load error:", err);
-      setError("Ошибка загрузки профиля. Попробуйте очистить кэш.");
+      setError("Ошибка загрузки профиля.");
       setLoading(false);
     }
   }, []);
@@ -61,19 +64,14 @@ export default function ProfilePage() {
     return h?.name || "Наставник";
   };
 
-  if (loading) {
-    return (<div className="container mx-auto px-4 py-12 text-center"><Loader2 className="h-8 w-8 animate-spin mx-auto text-muted-foreground" /></div>);
-  }
-  if (error) {
-    return (<div className="container mx-auto px-4 py-12 text-center"><h2 className="text-xl font-semibold text-destructive mb-2">Ошибка</h2><p className="text-muted-foreground mb-4">{error}</p><Button onClick={() => window.location.reload()}>Перезагрузить</Button></div>);
-  }
-  if (!user) {
-    return (<div className="container mx-auto px-4 py-12 text-center"><User className="h-16 w-16 mx-auto mb-4 text-muted-foreground" /><h2 className="text-xl font-semibold mb-2">Вы не авторизованы</h2><p className="text-muted-foreground mb-4">Войдите в аккаунт, чтобы увидеть профиль</p><Button onClick={() => router.push("/login")}>Войти</Button></div>);
-  }
+  if (loading) return (<div className="container mx-auto px-4 py-12 text-center"><Loader2 className="h-8 w-8 animate-spin mx-auto text-muted-foreground" /></div>);
+  if (error) return (<div className="container mx-auto px-4 py-12 text-center"><h2 className="text-xl font-semibold text-destructive mb-2">Ошибка</h2><p className="text-muted-foreground mb-4">{error}</p></div>);
+  if (!user) return (<div className="container mx-auto px-4 py-12 text-center"><User className="h-16 w-16 mx-auto mb-4 text-muted-foreground" /><h2 className="text-xl font-semibold mb-2">Вы не авторизованы</h2><Button onClick={() => router.push("/login")}>Войти</Button></div>);
 
   const lastResult = testResults.length > 0 ? testResults[testResults.length - 1] : null;
   const prevResult = testResults.length > 1 ? testResults[testResults.length - 2] : null;
   const activeSessions = gameSessions.filter((s: any) => s.status === "pending" && s.helperId);
+  const lastPsycho = psychologyResults.length > 0 ? psychologyResults[psychologyResults.length - 1] : null;
 
   const getDelta = (key: string) => {
     if (!lastResult || !prevResult) return null;
@@ -99,49 +97,10 @@ export default function ProfilePage() {
     JP: "Суждение — Восприятие",
   };
 
-  const DimensionCard = ({ key, dim, scaleKey }: { key: string; dim: any; scaleKey: string }) => {
-    let first = 0, second = 0, firstLabel = "", secondLabel = "";
-    if (dim.E !== undefined) { first = dim.E; second = dim.I || 0; firstLabel = "E"; secondLabel = "I"; }
-    else if (dim.S !== undefined) { first = dim.S; second = dim.N || 0; firstLabel = "S"; secondLabel = "N"; }
-    else if (dim.T !== undefined) { first = dim.T; second = dim.F || 0; firstLabel = "T"; secondLabel = "F"; }
-    else { first = dim.J || 0; second = dim.P || 0; firstLabel = "J"; secondLabel = "P"; }
-
-    return (
-      <div key={key} className="p-4 rounded-xl border bg-card relative">
-        <div className="text-xs text-muted-foreground mb-1">{scaleNames[scaleKey]}</div>
-        <div className="text-lg font-bold mb-2">{dim.value}: {dim.score}%</div>
-        <div className="flex justify-between text-sm">
-          <span
-            className="flex items-center gap-1 cursor-help border-b border-dotted border-muted-foreground/30 hover:border-primary/50"
-            onMouseEnter={() => setHoveredScale(firstLabel)}
-            onMouseLeave={() => setHoveredScale(null)}
-          >
-            {firstLabel}: {first}%
-            <HelpCircle className="h-3 w-3 text-muted-foreground/50" />
-          </span>
-          <span
-            className="flex items-center gap-1 cursor-help border-b border-dotted border-muted-foreground/30 hover:border-primary/50"
-            onMouseEnter={() => setHoveredScale(secondLabel)}
-            onMouseLeave={() => setHoveredScale(null)}
-          >
-            {secondLabel}: {second}%
-            <HelpCircle className="h-3 w-3 text-muted-foreground/50" />
-          </span>
-        </div>
-        {hoveredScale && MBTI_TOOLTIPS[hoveredScale] && (
-          <div className="absolute z-50 bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 rounded-lg bg-popover text-popover-foreground text-xs shadow-lg border max-w-[200px] text-center pointer-events-none">
-            <p className="font-medium mb-0.5">{MBTI_TOOLTIPS[hoveredScale].label}</p>
-            <p className="text-muted-foreground">{MBTI_TOOLTIPS[hoveredScale].desc}</p>
-          </div>
-        )}
-      </div>
-    );
-  };
-
   return (
     <div className="container mx-auto px-4 py-12">
       <div className="max-w-4xl mx-auto space-y-8">
-        {/* Карточка */}
+        {/* Карточка пользователя */}
         <div className="p-6 rounded-xl border bg-card">
           <div className="flex items-center gap-4 mb-4">
             <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
@@ -183,8 +142,7 @@ export default function ProfilePage() {
                     </div>
                   </div>
                   <Button size="sm" onClick={() => router.push("/chat/" + s.id)}>
-                    <MessageCircle className="h-4 w-4 mr-1" />
-                    Чат
+                    <MessageCircle className="h-4 w-4 mr-1" /> Чат
                   </Button>
                 </div>
               ))}
@@ -192,12 +150,52 @@ export default function ProfilePage() {
           </div>
         )}
 
-        {/* Последний результат */}
+        {/* Психогеометрический тест */}
+        {lastPsycho ? (
+          <div className="p-6 rounded-xl border bg-card">
+            <div className="flex items-center gap-2 mb-4">
+              <Shapes className="h-5 w-5 text-blue-500" />
+              <h2 className="text-xl font-semibold">Психогеометрический тест</h2>
+            </div>
+            <div className={`p-6 rounded-xl border-2 ${lastPsycho.figure?.bgColor || "bg-card"}`}>
+              <div className="flex items-center gap-4 mb-3">
+                <span className={`text-5xl ${lastPsycho.figure?.color || "text-blue-500"}`}>
+                  {lastPsycho.figure?.symbol || "○"}
+                </span>
+                <div>
+                  <p className={`text-xl font-bold ${lastPsycho.figure?.color || "text-blue-500"}`}>
+                    {lastPsycho.figure?.name || "—"}
+                  </p>
+                  <p className="text-sm text-muted-foreground">{lastPsycho.figure?.title || ""}</p>
+                </div>
+              </div>
+              <p className="text-sm text-muted-foreground leading-relaxed mb-3">{lastPsycho.figure?.description}</p>
+              {lastPsycho.figure?.mbtiCorrelation && (
+                <p className="text-xs text-muted-foreground italic">Связь с MBTI: {lastPsycho.figure.mbtiCorrelation}</p>
+              )}
+            </div>
+            <div className="mt-3 flex items-center justify-between">
+              <span className="text-xs text-muted-foreground">{formatDate(lastPsycho.date)}</span>
+              <Button variant="outline" size="sm" onClick={() => router.push("/test/psychogeometry")}>Пройти заново</Button>
+            </div>
+          </div>
+        ) : (
+          <div className="p-6 rounded-xl border bg-card">
+            <div className="flex items-center gap-2 mb-2">
+              <Shapes className="h-5 w-5 text-blue-500" />
+              <h2 className="text-xl font-semibold">Психогеометрический тест</h2>
+            </div>
+            <p className="text-sm text-muted-foreground mb-4">Ещё не пройден. Узнай свой тип личности по геометрическим фигурам.</p>
+            <Button variant="outline" size="sm" onClick={() => router.push("/test/psychogeometry")}>Пройти тест</Button>
+          </div>
+        )}
+
+        {/* MBTI Результаты */}
         {lastResult && (
           <div className="p-6 rounded-xl border bg-card">
             <div className="flex items-center gap-2 mb-4">
               <Brain className="h-5 w-5 text-purple-500" />
-              <h2 className="text-xl font-semibold">Последний результат</h2>
+              <h2 className="text-xl font-semibold">MBTI — последний результат</h2>
             </div>
             <div className="text-center p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg mb-4">
               <p className="text-3xl font-bold text-purple-600 dark:text-purple-400">{lastResult.mbtiType || "—"}</p>
@@ -234,7 +232,7 @@ export default function ProfilePage() {
 
             {lastResult.dimensions && (
               <div className="grid grid-cols-2 gap-4">
-                {["EI", "SN", "TF", "JP"].map((key, idx) => {
+                {["EI", "SN", "TF", "JP"].map(key => {
                   const dim = lastResult.dimensions[key];
                   if (!dim) return null;
                   let first = 0, second = 0, firstLabel = "", secondLabel = "";
@@ -244,7 +242,7 @@ export default function ProfilePage() {
                   else { first = dim.J || 0; second = dim.P || 0; firstLabel = "J"; secondLabel = "P"; }
 
                   return (
-                    <div key={key} className={`p-4 rounded-xl border bg-card relative ${hoveredScale === key ? 'ring-2 ring-primary/20' : ''}`}>
+                    <div key={key} className="p-4 rounded-xl border bg-card relative">
                       <div className="text-xs text-muted-foreground mb-1">{scaleNames[key]}</div>
                       <div className="text-lg font-bold mb-2">{dim.value}: {dim.score}%</div>
                       <div className="space-y-1 text-sm">
@@ -279,7 +277,19 @@ export default function ProfilePage() {
               </div>
             )}
 
-            <div className="mt-4"><Button variant="outline" size="sm" onClick={() => router.push("/test")}>Пройти заново</Button></div>
+            <div className="mt-4 flex gap-2">
+              <Button variant="outline" size="sm" onClick={() => router.push("/test/mbti")}>Пройти заново</Button>
+              <Button variant="ghost" size="sm" onClick={() => router.push("/tests")}>Все тесты</Button>
+            </div>
+          </div>
+        )}
+
+        {!lastResult && (
+          <div className="text-center p-6 rounded-xl border bg-card">
+            <Brain className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+            <h2 className="text-xl font-semibold mb-2">Нет результатов MBTI</h2>
+            <p className="text-muted-foreground mb-4">Пройдите MBTI-тест, чтобы узнать свой тип личности</p>
+            <Button onClick={() => router.push("/test/mbti")}>Пройти MBTI-тест</Button>
           </div>
         )}
 
@@ -288,7 +298,7 @@ export default function ProfilePage() {
           <div className="p-6 rounded-xl border bg-card">
             <div className="flex items-center gap-2 mb-4">
               <ClipboardCheck className="h-5 w-5 text-blue-500" />
-              <h2 className="text-xl font-semibold">История тестов</h2>
+              <h2 className="text-xl font-semibold">История MBTI-тестов</h2>
             </div>
             <div className="space-y-3">
               {[...testResults].reverse().map((r, i) => (
@@ -356,15 +366,6 @@ export default function ProfilePage() {
                 );
               })}
             </div>
-          </div>
-        )}
-
-        {!lastResult && (
-          <div className="text-center p-6 rounded-xl border bg-card">
-            <Brain className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-            <h2 className="text-xl font-semibold mb-2">Нет результатов теста</h2>
-            <p className="text-muted-foreground mb-4">Пройдите MBTI-тест, чтобы узнать свой тип личности</p>
-            <Button onClick={() => router.push("/test")}>Пройти тест</Button>
           </div>
         )}
       </div>
