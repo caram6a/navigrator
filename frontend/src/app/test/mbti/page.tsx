@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Brain, ArrowLeft, CheckCircle } from "lucide-react";
 import { QUESTIONS, MBTI_DESCRIPTIONS } from "@/lib/openjung";
 import { GAMES } from "@/lib/games-data";
+import { testApi } from "@/lib/api";
 
 type DimensionData = {
   value: string;
@@ -95,14 +96,18 @@ function calculateMBTI(answers: Record<number, number>): TestResult {
 }
 
 function saveResult(res: TestResult) {
-  const token = localStorage.getItem("token");
-  const key = token ? ("testResults_" + token) : "guestTestResults";
+  let userId: string | null = null;
+  try {
+    const cu = localStorage.getItem("currentUser");
+    if (cu) userId = JSON.parse(cu).id;
+  } catch {}
+  const key = userId ? ("testResults_" + userId) : "guestTestResults";
   const existing = JSON.parse(localStorage.getItem(key) || "[]");
   existing.push(res);
   localStorage.setItem(key, JSON.stringify(existing));
-  if (token) {
+  if (userId) {
     const users = JSON.parse(localStorage.getItem("users") || "[]");
-    const idx = users.findIndex((u: any) => u.id === token);
+    const idx = users.findIndex((u: any) => u.id === userId);
     if (idx !== -1) {
       users[idx].mbti_type = res.mbtiType;
       localStorage.setItem("users", JSON.stringify(users));
@@ -153,6 +158,8 @@ export default function MBTITestPage() {
     await new Promise(r => setTimeout(r, 500));
     const res = calculateMBTI(answers);
     saveResult(res);
+    // Save to server
+    testApi.saveResult("mbti", res).catch(() => {});
     if (isRetake) { setResult(res); setGameSessionStep(true); }
     else { setResult(res); }
     setSubmitting(false);
@@ -246,7 +253,6 @@ export default function MBTITestPage() {
                             onChange={(e) => setSelectedGames(prev => ({ ...prev, [game.id]: { ...prev[game.id], helper: e.target.value } }))}
                             className="flex-1 px-2 py-1 rounded border bg-background text-sm">
                             <option value="">Не было</option>
-                            <option value="helper_fake_1">Алексей Наставников</option>
                           </select>
                         </div>
                         <div className="flex items-center gap-2">

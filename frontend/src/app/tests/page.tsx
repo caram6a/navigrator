@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { Brain, Shapes, Eye, ArrowRight } from "lucide-react";
+import { Brain, Eye, ArrowRight } from "lucide-react";
 
 const TESTS = [
   {
@@ -15,18 +15,6 @@ const TESTS = [
     borderColor: "border-purple-200 dark:border-purple-800",
     href: "/test/mbti",
     duration: "10-15 минут",
-  },
-  {
-    id: "psychogeometry",
-    title: "Психогеометрический тест",
-    subtitle: "Геометрия личности",
-    description: "Выбери фигуру, которая тебя олицетворяет. Узнай свой тип личности по методике Сьюзен Деллингер и его связь с MBTI.",
-    icon: Shapes,
-    color: "text-blue-500",
-    bgColor: "bg-blue-50 dark:bg-blue-950",
-    borderColor: "border-blue-200 dark:border-blue-800",
-    href: "/test/psychogeometry",
-    duration: "2-3 минуты",
   },
   {
     id: "visual",

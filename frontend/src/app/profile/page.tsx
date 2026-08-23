@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { User, Brain, TrendingUp, ClipboardCheck, Loader2, Gamepad2, Calendar, ArrowUp, ArrowDown, MessageCircle, HelpCircle, Eye } from "lucide-react";
 import { GAMES } from "@/lib/games-data";
 import { QUESTIONS, MBTI_DESCRIPTIONS } from "@/lib/openjung";
+import { testApi } from "@/lib/api";
+import { SCALES } from "@/lib/visual-test";
 
 const MBTI_TOOLTIPS: Record<string, Record<string, string>> = {
   E: { label: "Экстраверсия", desc: "Ориентация на внешний мир, общение с людьми, активность в группе" },
@@ -103,12 +105,22 @@ export default function ProfilePage() {
       setUser(parsed);
       const all = JSON.parse(localStorage.getItem("users") || "[]");
       setAllUsers(all);
+      // Load from localStorage as fallback
       const results = JSON.parse(localStorage.getItem("testResults_" + parsed.id) || "[]");
       setTestResults(results);
       const vis = JSON.parse(localStorage.getItem("visualTestResults_" + parsed.id) || "[]");
       setVisualResults(vis);
       const sessions = JSON.parse(localStorage.getItem("gameSessions_" + parsed.id) || "[]");
       setGameSessions(sessions);
+      // Try to load from server (overwrites local if successful)
+      testApi.getResults().then(res => {
+        if (res.results && res.results.length > 0) {
+          const mbtiResults = res.results.filter((r: any) => r.testType === "mbti").map((r: any) => r.result);
+          const visualResults = res.results.filter((r: any) => r.testType === "visual").map((r: any) => r.result);
+          if (mbtiResults.length > 0) setTestResults(mbtiResults);
+          if (visualResults.length > 0) setVisualResults(visualResults);
+        }
+      }).catch(() => {});
       setLoading(false);
     } catch (err) {
       console.error("Profile load error:", err);
@@ -146,6 +158,8 @@ export default function ProfilePage() {
         localStorage.setItem("testResults_" + userId, JSON.stringify(existing));
         setTestResults(existing);
       }
+      // Save to server
+      testApi.saveResult("mbti", result).catch(() => {});
     }
   };
 
@@ -322,13 +336,40 @@ export default function ProfilePage() {
               <Eye className="h-5 w-5 text-emerald-500" />
               <h2 className="text-xl font-semibold">Визуальный тест личности</h2>
             </div>
-            <div className="p-6 rounded-xl border-2 bg-emerald-50/50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800">
-              <p className="text-xl font-bold text-emerald-600 dark:text-emerald-400 mb-2">{lastVisual.profile}</p>
-              <p className="text-sm text-muted-foreground leading-relaxed mb-3 whitespace-pre-line">{lastVisual.description}</p>
+            <div className="text-center p-4 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg mb-4">
+              <p className="text-3xl font-bold text-emerald-600 dark:text-emerald-400 mb-1">{lastVisual.profile || "—"}</p>
+              <p className="text-sm text-muted-foreground mt-1">{formatDate(lastVisual.date)}</p>
             </div>
-            <div className="mt-3 flex items-center justify-between">
-              <span className="text-xs text-muted-foreground">{formatDate(lastVisual.date)}</span>
+            {lastVisual.scales && (
+              <div className="grid grid-cols-2 gap-4">
+                {SCALES.map((scale) => {
+                  const data = lastVisual.scales[scale.id];
+                  if (!data) return null;
+                  const isLeftDominant = data.score >= 50;
+                  const leftPct = data.score;
+                  const rightPct = 100 - data.score;
+                  return (
+                    <div key={scale.id} className="p-4 rounded-xl border bg-card">
+                      <div className="text-xs text-muted-foreground mb-1">{scale.name}</div>
+                      <div className="text-lg font-bold mb-2">{isLeftDominant ? scale.leftLabel : scale.rightLabel}: {Math.round(Math.max(leftPct, rightPct))}%</div>
+                      <div className="space-y-1 text-sm">
+                        <div className="flex items-center justify-between p-1.5 rounded hover:bg-muted/50 transition-colors">
+                          <span className="font-medium">{scale.leftLabel}</span>
+                          <span>{Math.round(leftPct)}%</span>
+                        </div>
+                        <div className="flex items-center justify-between p-1.5 rounded hover:bg-muted/50 transition-colors">
+                          <span className="font-medium">{scale.rightLabel}</span>
+                          <span>{Math.round(rightPct)}%</span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            <div className="mt-4 flex gap-2">
               <Button variant="outline" size="sm" onClick={() => router.push("/test/visual")}>Пройти заново</Button>
+              <Button variant="ghost" size="sm" onClick={() => router.push("/tests")}>Все тесты</Button>
             </div>
           </div>
         ) : (
@@ -492,7 +533,7 @@ export default function ProfilePage() {
                         {Object.entries(s.games).map(([gameId, data]: [string, any]) => (
                           <div key={gameId} className="flex items-center justify-between text-sm">
                             <span>{getGameTitle(parseInt(gameId))}</span>
-                            <span className="text-muted-foreground">{data.times} раз(а){data.helper ? ` | Наставник: Алексей Наставников` : ""}</span>
+                            <span className="text-muted-foreground">{data.times} раз(а){data.helper ? ` | Наставник: ${data.helper}` : ""}</span>
                           </div>
                         ))}
                       </div>

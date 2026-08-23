@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Shapes, ArrowLeft, CheckCircle, Brain, Loader2 } from "lucide-react";
 import { generateQuestions, calculateResult, saveResult, FIGURE_DEFS, COLORS, STROKE_WIDTHS, SCALES, type VisualTestResult, type TestQuestion } from "@/lib/visual-test";
+import { testApi } from "@/lib/api";
 
 function FigureSVG({ shape, variant, color, fill, size }: {
   shape: string;
@@ -74,6 +75,8 @@ export default function VisualTestPage() {
     setSubmitting(true);
     const res = calculateResult(answers, questions);
     saveResult(res);
+    // Save to server
+    testApi.saveResult("visual", res).catch(() => {});
     setResult(res);
     setSubmitting(false);
   };

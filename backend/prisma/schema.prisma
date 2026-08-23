@@ -21,6 +21,7 @@ model User {
   sessionsAsPlayer Session[] @relation("PlayerSessions")
   sessionsAsHelper Session[] @relation("HelperSessions")
   notes          Note[]
+  testResults    TestResult[]
 
   @@map("users")
 }
@@ -113,4 +114,18 @@ model Note {
   author User @relation(fields: [authorId], references: [id], onDelete: Cascade)
 
   @@map("notes")
+}
+
+model TestResult {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  testType  String   @map("test_type")  // "mbti" | "visual"
+  result    Json
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("test_results")
+
+  @@index([userId, testType])
 }

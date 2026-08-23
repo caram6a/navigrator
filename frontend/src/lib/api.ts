@@ -164,4 +164,11 @@ export const testApi = {
       mbtiType: string;
       description: { title: string; description: string; strengths: string[]; growth: string[] };
     }>("/api/test/result"),
+  saveResult: (testType: "mbti" | "visual", result: any) =>
+    request<{ testResult: any }>("/api/test/save", {
+      method: "POST",
+      body: { testType, result },
+    }),
+  getResults: () => request<{ results: any[] }>("/api/test/results"),
+  getResultsByType: (type: "mbti" | "visual") => request<{ results: any[] }>(`/api/test/results/${type}`),
 };
