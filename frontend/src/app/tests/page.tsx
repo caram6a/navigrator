@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { Brain, Shapes, ArrowRight } from "lucide-react";
+import { Brain, Shapes, Eye, ArrowRight } from "lucide-react";
 
 const TESTS = [
   {
@@ -27,6 +27,18 @@ const TESTS = [
     borderColor: "border-blue-200 dark:border-blue-800",
     href: "/test/psychogeometry",
     duration: "2-3 минуты",
+  },
+  {
+    id: "visual",
+    title: "Визуальный тест личности",
+    subtitle: "80 вопросов с фигурами",
+    description: "80 вопросов с парами геометрических фигур. Выбирай ту, что нравится больше — узнай свой многомерный профиль личности по 10 шкалам.",
+    icon: Eye,
+    color: "text-emerald-500",
+    bgColor: "bg-emerald-50 dark:bg-emerald-950",
+    borderColor: "border-emerald-200 dark:border-emerald-800",
+    href: "/test/visual",
+    duration: "10-15 минут",
   },
 ];
 

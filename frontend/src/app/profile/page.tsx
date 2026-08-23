@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { User, Brain, TrendingUp, ClipboardCheck, Loader2, Gamepad2, Calendar, ArrowUp, ArrowDown, MessageCircle, HelpCircle, Shapes } from "lucide-react";
+import { User, Brain, TrendingUp, ClipboardCheck, Loader2, Gamepad2, Calendar, ArrowUp, ArrowDown, MessageCircle, HelpCircle, Shapes, Eye } from "lucide-react";
 import { GAMES } from "@/lib/games-data";
 import { FIGURES } from "@/lib/psychogeometry";
 
@@ -24,6 +24,7 @@ export default function ProfilePage() {
   const [user, setUser] = useState<any>(null);
   const [testResults, setTestResults] = useState<any[]>([]);
   const [psychologyResults, setPsychologyResults] = useState<any[]>([]);
+  const [visualResults, setVisualResults] = useState<any[]>([]);
   const [gameSessions, setGameSessions] = useState<any[]>([]);
   const [allUsers, setAllUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -49,6 +50,8 @@ export default function ProfilePage() {
       setTestResults(results);
       const psycho = JSON.parse(localStorage.getItem("psychogeometryResults_" + token) || "[]");
       setPsychologyResults(psycho);
+      const vis = JSON.parse(localStorage.getItem("visualTestResults_" + token) || "[]");
+      setVisualResults(vis);
       const sessions = JSON.parse(localStorage.getItem("gameSessions_" + token) || "[]");
       setGameSessions(sessions);
       setLoading(false);
@@ -72,6 +75,7 @@ export default function ProfilePage() {
   const prevResult = testResults.length > 1 ? testResults[testResults.length - 2] : null;
   const activeSessions = gameSessions.filter((s: any) => s.status === "pending" && s.helperId);
   const lastPsycho = psychologyResults.length > 0 ? psychologyResults[psychologyResults.length - 1] : null;
+  const lastVisual = visualResults.length > 0 ? visualResults[visualResults.length - 1] : null;
 
   const getDelta = (key: string) => {
     if (!lastResult || !prevResult) return null;
@@ -147,6 +151,33 @@ export default function ProfilePage() {
                 </div>
               ))}
             </div>
+          </div>
+        )}
+
+        {/* Визуальный тест личности */}
+        {lastVisual ? (
+          <div className="p-6 rounded-xl border bg-card">
+            <div className="flex items-center gap-2 mb-4">
+              <Eye className="h-5 w-5 text-emerald-500" />
+              <h2 className="text-xl font-semibold">Визуальный тест личности</h2>
+            </div>
+            <div className="p-6 rounded-xl border-2 bg-emerald-50/50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800">
+              <p className="text-xl font-bold text-emerald-600 dark:text-emerald-400 mb-2">{lastVisual.profile}</p>
+              <p className="text-sm text-muted-foreground leading-relaxed mb-3 whitespace-pre-line">{lastVisual.description}</p>
+            </div>
+            <div className="mt-3 flex items-center justify-between">
+              <span className="text-xs text-muted-foreground">{formatDate(lastVisual.date)}</span>
+              <Button variant="outline" size="sm" onClick={() => router.push("/test/visual")}>Пройти заново</Button>
+            </div>
+          </div>
+        ) : (
+          <div className="p-6 rounded-xl border bg-card">
+            <div className="flex items-center gap-2 mb-2">
+              <Eye className="h-5 w-5 text-emerald-500" />
+              <h2 className="text-xl font-semibold">Визуальный тест личности</h2>
+            </div>
+            <p className="text-sm text-muted-foreground mb-4">80 вопросов с фигурами по 10 шкалам личности.</p>
+            <Button variant="outline" size="sm" onClick={() => router.push("/test/visual")}>Пройти тест</Button>
           </div>
         )}
 
