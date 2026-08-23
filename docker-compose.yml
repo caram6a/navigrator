@@ -11,7 +11,8 @@ services:
 
   backend:
     build:
-      context: ./backend
+      context: .
+      dockerfile: Dockerfile
     restart: unless-stopped
     ports:
       - "4000:4000"
