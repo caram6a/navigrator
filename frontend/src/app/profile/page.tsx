@@ -340,6 +340,11 @@ export default function ProfilePage() {
               <p className="text-3xl font-bold text-emerald-600 dark:text-emerald-400 mb-1">{lastVisual.profile || "—"}</p>
               <p className="text-sm text-muted-foreground mt-1">{formatDate(lastVisual.date)}</p>
             </div>
+            {lastVisual.description && (
+              <div className="mb-4 p-4 rounded-lg bg-accent/50">
+                <p className="text-sm text-muted-foreground whitespace-pre-line leading-relaxed">{lastVisual.description}</p>
+              </div>
+            )}
             {lastVisual.scales && (
               <div className="grid grid-cols-2 gap-4">
                 {SCALES.map((scale) => {
