@@ -334,9 +334,21 @@ export function calculateResult(answers: Record<number, number>, questions: Test
 }
 
 export function saveResult(res: VisualTestResult) {
-  const token = localStorage.getItem("token");
-  const key = token ? ("visualTestResults_" + token) : "guestVisualTestResults";
-  const existing = JSON.parse(localStorage.getItem(key) || "[]");
-  existing.push(res);
-  localStorage.setItem(key, JSON.stringify(existing));
+  // Сохраняем по userId, если есть currentUser
+  let userId: string | null = null;
+  try {
+    const cu = localStorage.getItem("currentUser");
+    if (cu) userId = JSON.parse(cu).id;
+  } catch {}
+  if (userId) {
+    const key = "visualTestResults_" + userId;
+    const existing = JSON.parse(localStorage.getItem(key) || "[]");
+    existing.push(res);
+    localStorage.setItem(key, JSON.stringify(existing));
+  }
+  // Всегда сохраняем и в гостевой ключ
+  const guestKey = "guestVisualTestResults";
+  const guestExisting = JSON.parse(localStorage.getItem(guestKey) || "[]");
+  guestExisting.push(res);
+  localStorage.setItem(guestKey, JSON.stringify(guestExisting));
 }
