@@ -76,11 +76,18 @@ export default function ProfilePage() {
   const [error, setError] = useState<string | null>(null);
   const [hoveredScale, setHoveredScale] = useState<string | null>(null);
 
-  // Inline MBTI test state
+  // Inline test states
   const [showMbtiTest, setShowMbtiTest] = useState(false);
   const [answers, setAnswers] = useState<Record<number, number>>({});
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [mbtiResult, setMbtiResult] = useState<MbtiTestResult | null>(null);
+
+  // Inline visual test state
+  const [showVisualTest, setShowVisualTest] = useState(false);
+  const [visualQuestions, setVisualQuestions] = useState<any[]>([]);
+  const [visualAnswers, setVisualAnswers] = useState<Record<number, number>>({});
+  const [visualCurrent, setVisualCurrent] = useState(0);
+  const [visualResult, setVisualResult] = useState<any>(null);
 
   const roleLabels: Record<string, string> = {
     admin: "Администратор", leader: "Лидер", helper: "Помощник", player: "Игрок",
