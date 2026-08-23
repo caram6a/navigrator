@@ -148,35 +148,36 @@ export default function AdminPage() {
     };
   }, [router]);
 
+  const [actionError, setActionError] = useState<string | null>(null);
+
   const toggleVerify = async (userId: string) => {
+    setActionError(null);
     try {
-      await usersApi.verify(userId);
-      setUserList(prev => prev.map(u => u.id === userId ? { ...u, isVerified: true } : u));
-    } catch {
-      // fallback на localStorage
+      const res = await usersApi.verify(userId);
+      // Обновляем в списке
+      setUserList(prev => prev.map(u => u.id === userId ? { ...u, isVerified: res.user?.isVerified ?? true } : u));
+      // Обновляем в localStorage
       const all = JSON.parse(localStorage.getItem("users") || "[]");
       const idx = all.findIndex((u: any) => u.id === userId);
-      if (idx !== -1) {
-        all[idx].is_verified = !all[idx].is_verified;
-        localStorage.setItem("users", JSON.stringify(all));
-        setUserList([...all]);
-      }
+      if (idx !== -1) { all[idx].isVerified = true; localStorage.setItem("users", JSON.stringify(all)); }
+    } catch (e: any) {
+      console.error("Verify error:", e);
+      setActionError(e.message || "Ошибка при одобрении");
     }
   };
 
   const changeRole = async (userId: string, newRole: string) => {
+    setActionError(null);
     try {
       await usersApi.updateRole(userId, newRole);
       setUserList(prev => prev.map(u => u.id === userId ? { ...u, role: newRole } : u));
-    } catch {
-      // fallback на localStorage
+      // Обновляем в localStorage
       const all = JSON.parse(localStorage.getItem("users") || "[]");
       const idx = all.findIndex((u: any) => u.id === userId);
-      if (idx !== -1) {
-        all[idx].role = newRole;
-        localStorage.setItem("users", JSON.stringify(all));
-        setUserList([...all]);
-      }
+      if (idx !== -1) { all[idx].role = newRole; localStorage.setItem("users", JSON.stringify(all)); }
+    } catch (e: any) {
+      console.error("Change role error:", e);
+      setActionError(e.message || "Ошибка при смене роли");
     }
   };
 
@@ -419,6 +420,11 @@ export default function AdminPage() {
           <h1 className="text-3xl font-bold">Админ-панель</h1>
         </div>
 
+        {actionError && (
+          <div className="p-3 mb-4 rounded-lg border-2 border-destructive bg-destructive/10 text-destructive text-sm">
+            {actionError}
+          </div>
+        )}
         <div className="flex gap-2 mb-8 flex-wrap">
           {tabs.map((t) => (
             <Button
