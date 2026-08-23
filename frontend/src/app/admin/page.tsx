@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Shield, Users as UsersIcon, BookOpen, Swords, CheckCircle, XCircle, Loader2, Plus, Trash2, Edit3, Save, StickyNote, User } from "lucide-react";
+import { Shield, Users as UsersIcon, BookOpen, Swords, CheckCircle, XCircle, Loader2, Plus, Trash2, Edit3, Save, StickyNote, User, Cloud, RefreshCw } from "lucide-react";
+import { ApiError, notes as notesApi, syncLocalToApi } from "@/lib/api";
 
 type Tab = "helpers" | "players" | "all" | "competencies" | "games" | "notes";
 
@@ -238,9 +239,68 @@ export default function AdminPage() {
     }));
   };
 
-  // Заметки
-  const addNote = () => {
+  // Заметки — гибрид: локально + API
+  const [apiConnected, setApiConnected] = useState<boolean | null>(null);
+  const [syncingNotes, setSyncingNotes] = useState(false);
+
+  const loadNotes = useCallback(async () => {
+    // Сначала загружаем локальные
+    const local = getAdminNotes();
+    setNotes(local);
+    // Пытаемся загрузить с API
+    try {
+      const data = await notesApi.list();
+      if (data.notes) {
+        setNotes(data.notes.map((n: any) => ({
+          id: n.id,
+          text: n.text,
+          authorId: n.author.id,
+          authorName: n.author.name,
+          createdAt: n.createdAt,
+        })));
+        // Обновляем локальный кеш
+        saveAdminNotes(data.notes.map((n: any) => ({
+          id: n.id,
+          text: n.text,
+          authorId: n.author.id,
+          authorName: n.author.name,
+          createdAt: n.createdAt,
+        })));
+        setApiConnected(true);
+      }
+    } catch {
+      setApiConnected(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (tab === "notes") loadNotes();
+  }, [tab, loadNotes]);
+
+  const addNote = async () => {
     if (!noteText.trim() || !currentUser) return;
+    // Пытаемся через API
+    if (apiConnected) {
+      try {
+        const data = await notesApi.create({ text: noteText.trim() });
+        const newNote: AdminNote = {
+          id: data.note.id,
+          text: data.note.text,
+          authorId: data.note.author.id,
+          authorName: data.note.author.name,
+          createdAt: data.note.createdAt,
+        };
+        const allNotes = getAdminNotes();
+        allNotes.push(newNote);
+        saveAdminNotes(allNotes);
+        setNotes(allNotes);
+        setNoteText("");
+        return;
+      } catch {
+        // fallback to localStorage
+      }
+    }
+    // LocalStorage fallback
     const newNote: AdminNote = {
       id: Date.now().toString(),
       text: noteText.trim(),
@@ -255,9 +315,27 @@ export default function AdminPage() {
     setNoteText("");
   };
 
-  const deleteNote = (id: string) => {
+  const deleteNote = async (id: string) => {
+    if (apiConnected) {
+      try {
+        await notesApi.delete(id);
+      } catch {
+        // fallback
+      }
+    }
     saveAdminNotes(getAdminNotes().filter(n => n.id !== id));
     setNotes(getAdminNotes());
+  };
+
+  const syncNotesToApi = async () => {
+    setSyncingNotes(true);
+    try {
+      await syncLocalToApi("/api/notes", "adminNotes", (item) => ({ text: item.text }));
+      await loadNotes();
+    } catch (e) {
+      console.error("Sync failed:", e);
+    }
+    setSyncingNotes(false);
   };
 
   const roleLabels: Record<string, string> = {
@@ -652,12 +730,24 @@ export default function AdminPage() {
 
         {tab === "notes" && (
           <div className="space-y-4">
-            <h2 className="text-xl font-semibold mb-4">
-              Заметки администраторов
-              <span className="text-sm font-normal text-muted-foreground ml-2">
-                (видны всем админам, автообновление каждые 5 сек)
-              </span>
-            </h2>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-semibold">
+                Заметки администраторов
+                <span className="text-sm font-normal text-muted-foreground ml-2">
+                  {apiConnected === true ? "🟢 через API" : apiConnected === false ? "🟡 локально" : "⚪ проверка..."}
+                </span>
+              </h2>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={loadNotes} disabled={syncingNotes}>
+                  <RefreshCw className={"h-4 w-4 mr-1 " + (syncingNotes ? "animate-spin" : "")} />
+                  Обновить
+                </Button>
+                <Button variant="outline" size="sm" onClick={syncNotesToApi} disabled={syncingNotes}>
+                  <Cloud className="h-4 w-4 mr-1" />
+                  Синхр.
+                </Button>
+              </div>
+            </div>
 
             <div className="flex gap-2">
               <textarea

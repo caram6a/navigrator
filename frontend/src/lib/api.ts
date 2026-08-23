@@ -113,6 +113,30 @@ export const sessions = {
   all: () => request<{ sessions: any[] }>("/api/sessions"),
 };
 
+// Notes
+export const notes = {
+  list: () => request<{ notes: any[] }>("/api/notes"),
+  create: (data: { text: string }) =>
+    request<{ note: any }>("/api/notes", { method: "POST", body: data }),
+  delete: (id: string) =>
+    request<{ message: string }>(`/api/notes/${id}`, { method: "DELETE" }),
+};
+
+// Sync utils
+export async function syncLocalToApi<T>(endpoint: string, localKey: string, mapper: (item: any) => any = (x) => x) {
+  const localData = JSON.parse(localStorage.getItem(localKey) || "[]");
+  if (localData.length === 0) return;
+  try {
+    for (const item of localData) {
+      await request(endpoint, { method: "POST", body: mapper(item) }).catch(() => {});
+    }
+    localStorage.removeItem(localKey);
+    console.log(`Synced ${localData.length} items from ${localKey} to API`);
+  } catch (e) {
+    console.warn(`Failed to sync ${localKey}:`, e);
+  }
+}
+
 // Test
 export const testApi = {
   questions: () => request<{ questions: any[]; dimensions: string[] }>("/api/test/questions"),
