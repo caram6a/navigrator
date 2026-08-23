@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Users, Star, Gamepad2, TrendingUp, Search, Loader2 } from "lucide-react";
+import { Users, Star, Gamepad2, TrendingUp, Search, Loader2, MessageCircle } from "lucide-react";
 import { GAMES } from "@/lib/games-data";
 
 export default function HelpersPage() {
@@ -12,6 +12,7 @@ export default function HelpersPage() {
   const [loading, setLoading] = useState(true);
   const [selectedGame, setSelectedGame] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [currentUser, setCurrentUser] = useState<any>(null);
 
   useEffect(() => {
     const users = JSON.parse(localStorage.getItem("users") || "[]");
@@ -19,13 +20,15 @@ export default function HelpersPage() {
     setHelpers(verifiedHelpers);
     setLoading(false);
 
-    // Получаем выбранную игру из URL
+    const userData = localStorage.getItem("currentUser");
+    if (userData) { try { setCurrentUser(JSON.parse(userData)); } catch {} }
+
     const params = new URLSearchParams(window.location.search);
     const gameId = params.get("game");
     if (gameId) setSelectedGame(parseInt(gameId));
   }, []);
 
-  // Считаем рейтинг помощника (на основе сессий)
+  // Рейтинг помощника
   const getHelperRating = (helperId: string) => {
     const sessions = JSON.parse(localStorage.getItem("gameSessions_" + helperId) || "[]");
     if (sessions.length === 0) return null;
@@ -34,25 +37,37 @@ export default function HelpersPage() {
     return Math.min(5, Math.round((completed.length / sessions.length) * 5));
   };
 
-  // Считаем сколько людей у помощника
+  // Уникальные ученики помощника
   const getHelperStudents = (helperId: string) => {
     const allUsers = JSON.parse(localStorage.getItem("users") || "[]");
-    let count = 0;
+    const studentIds = new Set<string>();
     allUsers.forEach((u: any) => {
       const sessions = JSON.parse(localStorage.getItem("gameSessions_" + u.id) || "[]");
-      count += sessions.filter((s: any) => s.helperId === helperId).length;
+      const hasHelper = sessions.some((s: any) => s.helperId === helperId);
+      if (hasHelper) studentIds.add(u.id);
     });
-    return count;
+    return studentIds.size;
   };
 
-  // Какие игры ведёт помощник
+  // Игры которые вёл помощник (из сессий игроков)
   const getHelperGames = (helperId: string) => {
-    const sessions = JSON.parse(localStorage.getItem("gameSessions_" + helperId) || "[]");
+    const allUsers = JSON.parse(localStorage.getItem("users") || "[]");
     const gameIds = new Set<number>();
-    sessions.forEach((s: any) => {
-      if (s.games) Object.keys(s.games).forEach((gid: string) => gameIds.add(parseInt(gid)));
+    allUsers.forEach((u: any) => {
+      const sessions = JSON.parse(localStorage.getItem("gameSessions_" + u.id) || "[]");
+      sessions.filter((s: any) => s.helperId === helperId).forEach((s: any) => {
+        if (s.gameId) gameIds.add(s.gameId);
+      });
     });
     return GAMES.filter(g => gameIds.has(g.id));
+  };
+
+  // Есть ли активный чат у текущего пользователя с этим помощником
+  const getActiveChatId = (helperId: string) => {
+    if (!currentUser) return null;
+    const sessions = JSON.parse(localStorage.getItem("gameSessions_" + currentUser.id) || "[]");
+    const active = sessions.find((s: any) => s.helperId === helperId && s.status === "pending");
+    return active?.id || null;
   };
 
   const filteredHelpers = helpers.filter(h =>
@@ -105,6 +120,7 @@ export default function HelpersPage() {
               const rating = getHelperRating(helper.id);
               const students = getHelperStudents(helper.id);
               const games = getHelperGames(helper.id);
+              const activeChatId = getActiveChatId(helper.id);
               return (
                 <div key={helper.id} className="p-6 rounded-xl border bg-card hover:shadow-md transition-all">
                   <div className="flex items-center gap-4 mb-4">
@@ -159,12 +175,16 @@ export default function HelpersPage() {
                     </div>
                   )}
 
-                  <Button
-                    className="w-full"
-                    onClick={() => router.push(`/helper/${helper.id}${selectedGame ? `?game=${selectedGame}` : ""}`)}
-                  >
-                    Выбрать наставника
-                  </Button>
+                  {activeChatId ? (
+                    <Button className="w-full" variant="secondary" onClick={() => router.push("/chat/" + activeChatId)}>
+                      <MessageCircle className="h-4 w-4 mr-2" />
+                      Перейти в чат
+                    </Button>
+                  ) : (
+                    <Button className="w-full" onClick={() => router.push(`/helper/${helper.id}${selectedGame ? `?game=${selectedGame}` : ""}`)}>
+                      Выбрать наставника
+                    </Button>
+                  )}
                 </div>
               );
             })}

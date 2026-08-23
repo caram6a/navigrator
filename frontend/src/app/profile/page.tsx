@@ -3,8 +3,20 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { User, Brain, TrendingUp, ClipboardCheck, Loader2, Gamepad2, Calendar, ArrowUp, ArrowDown } from "lucide-react";
+import { User, Brain, TrendingUp, ClipboardCheck, Loader2, Gamepad2, Calendar, ArrowUp, ArrowDown, MessageCircle, HelpCircle } from "lucide-react";
 import { GAMES } from "@/lib/games-data";
+
+// Пояснения к шкалам MBTI
+const MBTI_TOOLTIPS: Record<string, Record<string, string>> = {
+  E: { label: "Экстраверсия", desc: "Ориентация на внешний мир, общение с людьми, активность в группе" },
+  I: { label: "Интроверсия", desc: "Ориентация на внутренний мир, размышления, предпочтение уединения" },
+  S: { label: "Сенсорика", desc: "Внимание к деталям, фактам, практическому опыту, конкретике" },
+  N: { label: "Интуиция", desc: "Внимание к общим идеям, абстракциям, возможностям, будущему" },
+  T: { label: "Мышление", desc: "Принятие решений на основе логики, анализа и объективных критериев" },
+  F: { label: "Чувство", desc: "Принятие решений на основе ценностей, эмоций и гармонии" },
+  J: { label: "Суждение", desc: "Предпочтение структуры, планов, организованности и определённости" },
+  P: { label: "Восприятие", desc: "Предпочтение гибкости, спонтанности, открытости новому" },
+};
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -12,8 +24,10 @@ export default function ProfilePage() {
   const [user, setUser] = useState<any>(null);
   const [testResults, setTestResults] = useState<any[]>([]);
   const [gameSessions, setGameSessions] = useState<any[]>([]);
+  const [allUsers, setAllUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [hoveredScale, setHoveredScale] = useState<string | null>(null);
 
   const roleLabels: Record<string, string> = {
     admin: "Администратор",
@@ -25,27 +39,15 @@ export default function ProfilePage() {
   useEffect(() => {
     try {
       const token = localStorage.getItem("token");
-      if (!token) {
-        setLoading(false);
-        return;
-      }
+      if (!token) { setLoading(false); return; }
       const users = JSON.parse(localStorage.getItem("users") || "[]");
+      setAllUsers(users);
       const found = users.find((u: any) => u.id === token);
-      if (found) {
-        setUser(found);
-        localStorage.setItem("currentUser", JSON.stringify(found));
-      }
-
-      // Загружаем историю тестов
+      if (found) { setUser(found); localStorage.setItem("currentUser", JSON.stringify(found)); }
       const results = JSON.parse(localStorage.getItem("testResults_" + token) || "[]");
       setTestResults(results);
-
-      // Загружаем игровые сессии — фильтруем только правильные
       const sessions = JSON.parse(localStorage.getItem("gameSessions_" + token) || "[]");
-      // Фильтруем сессии: оставляем только те, у кого есть поля noGames или games (формат с теста)
-      // или те, у кого есть status (формат с профиля помощника)
       setGameSessions(sessions);
-
       setLoading(false);
     } catch (err) {
       console.error("Profile load error:", err);
@@ -54,46 +56,29 @@ export default function ProfilePage() {
     }
   }, []);
 
+  const getHelperName = (helperId: string) => {
+    const h = allUsers.find((u: any) => u.id === helperId);
+    return h?.name || "Наставник";
+  };
+
   if (loading) {
-    return (
-      <div className="container mx-auto px-4 py-12 text-center">
-        <Loader2 className="h-8 w-8 animate-spin mx-auto text-muted-foreground" />
-      </div>
-    );
+    return (<div className="container mx-auto px-4 py-12 text-center"><Loader2 className="h-8 w-8 animate-spin mx-auto text-muted-foreground" /></div>);
   }
-
   if (error) {
-    return (
-      <div className="container mx-auto px-4 py-12 text-center">
-        <h2 className="text-xl font-semibold text-destructive mb-2">Ошибка</h2>
-        <p className="text-muted-foreground mb-4">{error}</p>
-        <Button onClick={() => window.location.reload()}>Перезагрузить</Button>
-      </div>
-    );
+    return (<div className="container mx-auto px-4 py-12 text-center"><h2 className="text-xl font-semibold text-destructive mb-2">Ошибка</h2><p className="text-muted-foreground mb-4">{error}</p><Button onClick={() => window.location.reload()}>Перезагрузить</Button></div>);
   }
-
   if (!user) {
-    return (
-      <div className="container mx-auto px-4 py-12 text-center">
-        <User className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
-        <h2 className="text-xl font-semibold mb-2">Вы не авторизованы</h2>
-        <p className="text-muted-foreground mb-4">Войдите в аккаунт, чтобы увидеть профиль</p>
-        <Button onClick={() => router.push("/login")}>Войти</Button>
-      </div>
-    );
+    return (<div className="container mx-auto px-4 py-12 text-center"><User className="h-16 w-16 mx-auto mb-4 text-muted-foreground" /><h2 className="text-xl font-semibold mb-2">Вы не авторизованы</h2><p className="text-muted-foreground mb-4">Войдите в аккаунт, чтобы увидеть профиль</p><Button onClick={() => router.push("/login")}>Войти</Button></div>);
   }
 
   const lastResult = testResults.length > 0 ? testResults[testResults.length - 1] : null;
   const prevResult = testResults.length > 1 ? testResults[testResults.length - 2] : null;
+  const activeSessions = gameSessions.filter((s: any) => s.status === "pending" && s.helperId);
 
-  // Считаем дельту
   const getDelta = (key: string) => {
     if (!lastResult || !prevResult) return null;
-    const last = lastResult.dimensions?.[key]?.score || 0;
-    const prev = prevResult.dimensions?.[key]?.score || 0;
-    return last - prev;
+    return (lastResult.dimensions?.[key]?.score || 0) - (prevResult.dimensions?.[key]?.score || 0);
   };
-
   const getAverageDelta = () => {
     if (!lastResult || !prevResult) return null;
     return Math.round((lastResult.average - prevResult.average) * 10) / 10;
@@ -101,28 +86,62 @@ export default function ProfilePage() {
 
   const formatDate = (d: string) => {
     if (!d) return "";
-    try {
-      return new Date(d).toLocaleDateString("ru-RU", {
-        day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit"
-      });
-    } catch {
-      return d;
-    }
+    try { return new Date(d).toLocaleDateString("ru-RU", { day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" }); }
+    catch { return d; }
   };
 
-  const getGameTitle = (id: number) => {
-    const game = GAMES.find(g => g.id === id);
-    return game?.title || "Неизвестная игра";
+  const getGameTitle = (id: number) => GAMES.find(g => g.id === id)?.title || "Неизвестная игра";
+
+  const scaleNames: Record<string, string> = {
+    EI: "Экстраверсия — Интроверсия",
+    SN: "Интуиция — Сенсорика",
+    TF: "Мышление — Чувство",
+    JP: "Суждение — Восприятие",
   };
 
-  // Определяем тип сессии
-  const isTestSession = (s: any) => s && (s.noGames !== undefined || (s.games && typeof s.games === 'object'));
-  const isHelperSession = (s: any) => s && s.helperId !== undefined;
+  const DimensionCard = ({ key, dim, scaleKey }: { key: string; dim: any; scaleKey: string }) => {
+    let first = 0, second = 0, firstLabel = "", secondLabel = "";
+    if (dim.E !== undefined) { first = dim.E; second = dim.I || 0; firstLabel = "E"; secondLabel = "I"; }
+    else if (dim.S !== undefined) { first = dim.S; second = dim.N || 0; firstLabel = "S"; secondLabel = "N"; }
+    else if (dim.T !== undefined) { first = dim.T; second = dim.F || 0; firstLabel = "T"; secondLabel = "F"; }
+    else { first = dim.J || 0; second = dim.P || 0; firstLabel = "J"; secondLabel = "P"; }
+
+    return (
+      <div key={key} className="p-4 rounded-xl border bg-card relative">
+        <div className="text-xs text-muted-foreground mb-1">{scaleNames[scaleKey]}</div>
+        <div className="text-lg font-bold mb-2">{dim.value}: {dim.score}%</div>
+        <div className="flex justify-between text-sm">
+          <span
+            className="flex items-center gap-1 cursor-help border-b border-dotted border-muted-foreground/30 hover:border-primary/50"
+            onMouseEnter={() => setHoveredScale(firstLabel)}
+            onMouseLeave={() => setHoveredScale(null)}
+          >
+            {firstLabel}: {first}%
+            <HelpCircle className="h-3 w-3 text-muted-foreground/50" />
+          </span>
+          <span
+            className="flex items-center gap-1 cursor-help border-b border-dotted border-muted-foreground/30 hover:border-primary/50"
+            onMouseEnter={() => setHoveredScale(secondLabel)}
+            onMouseLeave={() => setHoveredScale(null)}
+          >
+            {secondLabel}: {second}%
+            <HelpCircle className="h-3 w-3 text-muted-foreground/50" />
+          </span>
+        </div>
+        {hoveredScale && MBTI_TOOLTIPS[hoveredScale] && (
+          <div className="absolute z-50 bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 rounded-lg bg-popover text-popover-foreground text-xs shadow-lg border max-w-[200px] text-center pointer-events-none">
+            <p className="font-medium mb-0.5">{MBTI_TOOLTIPS[hoveredScale].label}</p>
+            <p className="text-muted-foreground">{MBTI_TOOLTIPS[hoveredScale].desc}</p>
+          </div>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div className="container mx-auto px-4 py-12">
       <div className="max-w-4xl mx-auto space-y-8">
-        {/* Карточка пользователя */}
+        {/* Карточка */}
         <div className="p-6 rounded-xl border bg-card">
           <div className="flex items-center gap-4 mb-4">
             <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
@@ -134,21 +153,44 @@ export default function ProfilePage() {
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
-            <span className="px-3 py-1 rounded-full text-sm bg-primary/10 text-primary">
-              {roleLabels[user.role] || user.role}
-            </span>
+            <span className="px-3 py-1 rounded-full text-sm bg-primary/10 text-primary">{roleLabels[user.role] || user.role}</span>
             {user.mbti_type && (
-              <span className="px-3 py-1 rounded-full text-sm bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300">
-                {user.mbti_type}
-              </span>
+              <span className="px-3 py-1 rounded-full text-sm bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300">{user.mbti_type}</span>
             )}
             {!user.is_verified && user.role === "helper" && (
-              <span className="px-3 py-1 rounded-full text-sm bg-yellow-100 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-300">
-                На проверке
-              </span>
+              <span className="px-3 py-1 rounded-full text-sm bg-yellow-100 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-300">На проверке</span>
             )}
           </div>
         </div>
+
+        {/* Активные сессии */}
+        {activeSessions.length > 0 && (
+          <div className="p-6 rounded-xl border bg-card border-green-200 dark:border-green-800">
+            <div className="flex items-center gap-2 mb-4">
+              <MessageCircle className="h-5 w-5 text-green-500" />
+              <h2 className="text-xl font-semibold">Активные сессии ({activeSessions.length})</h2>
+            </div>
+            <div className="space-y-3">
+              {activeSessions.map((s: any) => (
+                <div key={s.id} className="flex items-center justify-between p-3 rounded-lg border bg-green-50/50 dark:bg-green-950/20">
+                  <div className="flex items-center gap-3">
+                    <Gamepad2 className="h-5 w-5 text-green-500" />
+                    <div>
+                      <p className="font-medium">{getHelperName(s.helperId)}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {s.gameId ? getGameTitle(s.gameId) : "Без игры"} · {formatDate(s.date)}
+                      </p>
+                    </div>
+                  </div>
+                  <Button size="sm" onClick={() => router.push("/chat/" + s.id)}>
+                    <MessageCircle className="h-4 w-4 mr-1" />
+                    Чат
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Последний результат */}
         {lastResult && (
@@ -171,22 +213,15 @@ export default function ProfilePage() {
               <p className="text-xs text-muted-foreground mt-1">{formatDate(lastResult.date)}</p>
             </div>
 
-            {/* Дельта по шкалам */}
             {prevResult && lastResult.dimensions && (
               <div className="space-y-2 mb-4">
                 <p className="text-sm font-medium text-muted-foreground">Изменения с предыдущего теста:</p>
                 {["EI", "SN", "TF", "JP"].map(key => {
                   const delta = getDelta(key);
                   if (delta === null) return null;
-                  const names: Record<string, string> = {
-                    EI: "Экстраверсия — Интроверсия",
-                    SN: "Интуиция — Сенсорика",
-                    TF: "Мышление — Чувство",
-                    JP: "Суждение — Восприятие",
-                  };
                   return (
                     <div key={key} className="flex items-center justify-between text-sm">
-                      <span>{names[key]}</span>
+                      <span>{scaleNames[key]}</span>
                       <span className={delta >= 0 ? "text-green-500" : "text-red-500"}>
                         {delta >= 0 ? <ArrowUp className="h-3 w-3 inline" /> : <ArrowDown className="h-3 w-3 inline" />}
                         {delta >= 0 ? "+" : ""}{delta}%
@@ -199,7 +234,7 @@ export default function ProfilePage() {
 
             {lastResult.dimensions && (
               <div className="grid grid-cols-2 gap-4">
-                {["EI", "SN", "TF", "JP"].map(key => {
+                {["EI", "SN", "TF", "JP"].map((key, idx) => {
                   const dim = lastResult.dimensions[key];
                   if (!dim) return null;
                   let first = 0, second = 0, firstLabel = "", secondLabel = "";
@@ -207,19 +242,36 @@ export default function ProfilePage() {
                   else if (dim.S !== undefined) { first = dim.S; second = dim.N || 0; firstLabel = "S"; secondLabel = "N"; }
                   else if (dim.T !== undefined) { first = dim.T; second = dim.F || 0; firstLabel = "T"; secondLabel = "F"; }
                   else { first = dim.J || 0; second = dim.P || 0; firstLabel = "J"; secondLabel = "P"; }
-                  const scaleNames: Record<string, string> = {
-                    EI: "Экстраверсия — Интроверсия",
-                    SN: "Интуиция — Сенсорика",
-                    TF: "Мышление — Чувство",
-                    JP: "Суждение — Восприятие",
-                  };
+
                   return (
-                    <div key={key} className="p-4 rounded-xl border bg-card">
+                    <div key={key} className={`p-4 rounded-xl border bg-card relative ${hoveredScale === key ? 'ring-2 ring-primary/20' : ''}`}>
                       <div className="text-xs text-muted-foreground mb-1">{scaleNames[key]}</div>
                       <div className="text-lg font-bold mb-2">{dim.value}: {dim.score}%</div>
-                      <div className="flex justify-between text-sm">
-                        <span>{firstLabel}: {first}%</span>
-                        <span>{secondLabel}: {second}%</span>
+                      <div className="space-y-1 text-sm">
+                        <div className="flex items-center justify-between p-1.5 rounded hover:bg-muted/50 transition-colors cursor-help relative group"
+                          onMouseEnter={() => setHoveredScale(firstLabel)}
+                          onMouseLeave={() => setHoveredScale(null)}>
+                          <span className="font-medium">{firstLabel}</span>
+                          <span>{first}%</span>
+                          {hoveredScale === firstLabel && MBTI_TOOLTIPS[firstLabel] && (
+                            <div className="absolute z-50 bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 rounded-lg bg-popover text-popover-foreground text-xs shadow-lg border max-w-[220px] text-center pointer-events-none">
+                              <p className="font-medium mb-0.5">{MBTI_TOOLTIPS[firstLabel].label}</p>
+                              <p className="text-muted-foreground">{MBTI_TOOLTIPS[firstLabel].desc}</p>
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex items-center justify-between p-1.5 rounded hover:bg-muted/50 transition-colors cursor-help relative group"
+                          onMouseEnter={() => setHoveredScale(secondLabel)}
+                          onMouseLeave={() => setHoveredScale(null)}>
+                          <span className="font-medium">{secondLabel}</span>
+                          <span>{second}%</span>
+                          {hoveredScale === secondLabel && MBTI_TOOLTIPS[secondLabel] && (
+                            <div className="absolute z-50 bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 rounded-lg bg-popover text-popover-foreground text-xs shadow-lg border max-w-[220px] text-center pointer-events-none">
+                              <p className="font-medium mb-0.5">{MBTI_TOOLTIPS[secondLabel].label}</p>
+                              <p className="text-muted-foreground">{MBTI_TOOLTIPS[secondLabel].desc}</p>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
                   );
@@ -227,13 +279,11 @@ export default function ProfilePage() {
               </div>
             )}
 
-            <div className="mt-4">
-              <Button variant="outline" size="sm" onClick={() => router.push("/test")}>Пройти заново</Button>
-            </div>
+            <div className="mt-4"><Button variant="outline" size="sm" onClick={() => router.push("/test")}>Пройти заново</Button></div>
           </div>
         )}
 
-        {/* История всех результатов */}
+        {/* История тестов */}
         {testResults.length > 1 && (
           <div className="p-6 rounded-xl border bg-card">
             <div className="flex items-center gap-2 mb-4">
@@ -265,60 +315,50 @@ export default function ProfilePage() {
           <div className="p-6 rounded-xl border bg-card">
             <div className="flex items-center gap-2 mb-4">
               <Gamepad2 className="h-5 w-5 text-green-500" />
-              <h2 className="text-xl font-semibold">Игровые сессии</h2>
+              <h2 className="text-xl font-semibold">История сессий</h2>
             </div>
             <div className="space-y-3">
-              {[...gameSessions].reverse().map((s, i) => (
-                <div key={i} className="p-3 rounded-lg border">
-                  <p className="text-xs text-muted-foreground mb-2">{formatDate(s.date)}</p>
-                  
-                  {/* Сессия с теста (формат: noGames / games) */}
-                  {isTestSession(s) && (
-                    s.noGames ? (
+              {[...gameSessions].reverse().map((s, i) => {
+                const isHelperSession = s.helperId !== undefined;
+                return (
+                  <div key={i} className="p-3 rounded-lg border">
+                    <p className="text-xs text-muted-foreground mb-2">{formatDate(s.date)}</p>
+                    {!isHelperSession && s.noGames ? (
                       <p className="text-sm text-muted-foreground">Не играл в игры</p>
-                    ) : s.games ? (
+                    ) : !isHelperSession && s.games ? (
                       <div className="space-y-1">
                         {Object.entries(s.games).map(([gameId, data]: [string, any]) => (
                           <div key={gameId} className="flex items-center justify-between text-sm">
                             <span>{getGameTitle(parseInt(gameId))}</span>
-                            <span className="text-muted-foreground">
-                              {data.times} раз(а)
-                              {data.helper ? ` | Наставник: Алексей Наставников` : ""}
-                            </span>
+                            <span className="text-muted-foreground">{data.times} раз(а){data.helper ? ` | Наставник: Алексей Наставников` : ""}</span>
                           </div>
                         ))}
                       </div>
-                    ) : null
-                  )}
-                  
-                  {/* Сессия с помощника (формат: playerId, helperId, gameId) */}
-                  {isHelperSession(s) && (
-                    <div className="space-y-1">
-                      <div className="flex items-center justify-between text-sm">
-                        <span>
-                          {s.gameId ? getGameTitle(s.gameId) : "Без игры"}
-                        </span>
-                        <span className="text-muted-foreground">
-                          Статус: {s.status === "completed" ? "Завершена" : "Ожидает"}
-                        </span>
+                    ) : isHelperSession ? (
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-medium">{getHelperName(s.helperId)}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {s.gameId ? getGameTitle(s.gameId) : "Без игры"}
+                            {s.status === "completed" ? " · Завершена" : " · Активна"}
+                          </p>
+                        </div>
+                        {s.status === "pending" && (
+                          <Button size="sm" variant="outline" onClick={() => router.push("/chat/" + s.id)}>
+                            <MessageCircle className="h-3 w-3 mr-1" /> Чат
+                          </Button>
+                        )}
                       </div>
-                      <div className="text-xs text-muted-foreground">
-                        Сессия с наставником
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Неизвестный формат */}
-                  {!isTestSession(s) && !isHelperSession(s) && (
-                    <p className="text-sm text-muted-foreground">Сессия (данные недоступны)</p>
-                  )}
-                </div>
-              ))}
+                    ) : (
+                      <p className="text-sm text-muted-foreground">Сессия</p>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}
 
-        {/* Нет результатов */}
         {!lastResult && (
           <div className="text-center p-6 rounded-xl border bg-card">
             <Brain className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
