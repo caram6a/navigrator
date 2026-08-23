@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { User, Loader2, CheckCircle } from "lucide-react";
-import { auth } from "@/lib/api";
+import { auth, testApi } from "@/lib/api";
 
 export default function RegisterPage() {
   const [name, setName] = useState("");

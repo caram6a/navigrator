@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { LogIn, Loader2 } from "lucide-react";
-import { auth } from "@/lib/api";
+import { auth, testApi } from "@/lib/api";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");

@@ -112,13 +112,19 @@ export default function ProfilePage() {
       setVisualResults(vis);
       const sessions = JSON.parse(localStorage.getItem("gameSessions_" + parsed.id) || "[]");
       setGameSessions(sessions);
-      // Try to load from server (overwrites local if successful)
+      // Try to load from server (overwrites local if successful) and cache to localStorage
       testApi.getResults().then(res => {
         if (res.results && res.results.length > 0) {
-          const mbtiResults = res.results.filter((r: any) => r.testType === "mbti").map((r: any) => r.result);
-          const visualResults = res.results.filter((r: any) => r.testType === "visual").map((r: any) => r.result);
-          if (mbtiResults.length > 0) setTestResults(mbtiResults);
-          if (visualResults.length > 0) setVisualResults(visualResults);
+          const mbtiArr = res.results.filter((r: any) => r.testType === "mbti").map((r: any) => r.result);
+          const visualArr = res.results.filter((r: any) => r.testType === "visual").map((r: any) => r.result);
+          if (mbtiArr.length > 0) {
+            setTestResults(mbtiArr);
+            localStorage.setItem("testResults_" + parsed.id, JSON.stringify(mbtiArr));
+          }
+          if (visualArr.length > 0) {
+            setVisualResults(visualArr);
+            localStorage.setItem("visualTestResults_" + parsed.id, JSON.stringify(visualArr));
+          }
         }
       }).catch(() => {});
       setLoading(false);
@@ -334,17 +340,12 @@ export default function ProfilePage() {
           <div className="p-6 rounded-xl border bg-card">
             <div className="flex items-center gap-2 mb-4">
               <Eye className="h-5 w-5 text-emerald-500" />
-              <h2 className="text-xl font-semibold">Визуальный тест личности</h2>
+              <h2 className="text-xl font-semibold">Визуальный тест личности — последний результат</h2>
             </div>
             <div className="text-center p-4 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg mb-4">
-              <p className="text-3xl font-bold text-emerald-600 dark:text-emerald-400 mb-1">{lastVisual.profile || "—"}</p>
-              <p className="text-sm text-muted-foreground mt-1">{formatDate(lastVisual.date)}</p>
+              <p className="text-3xl font-bold text-emerald-600 dark:text-emerald-400">{lastVisual.profile || "—"}</p>
+              <p className="text-xs text-muted-foreground mt-1">{formatDate(lastVisual.date)}</p>
             </div>
-            {lastVisual.description && (
-              <div className="mb-4 p-4 rounded-lg bg-accent/50">
-                <p className="text-sm text-muted-foreground whitespace-pre-line leading-relaxed">{lastVisual.description}</p>
-              </div>
-            )}
             {lastVisual.scales && (
               <div className="grid grid-cols-2 gap-4">
                 {SCALES.map((scale) => {
@@ -353,18 +354,36 @@ export default function ProfilePage() {
                   const isLeftDominant = data.score >= 50;
                   const leftPct = data.score;
                   const rightPct = 100 - data.score;
+                  const leftKey = scale.leftLabel.substring(0, 2).toUpperCase();
+                  const rightKey = scale.rightLabel.substring(0, 2).toUpperCase();
                   return (
-                    <div key={scale.id} className="p-4 rounded-xl border bg-card">
+                    <div key={scale.id} className="p-4 rounded-xl border bg-card relative">
                       <div className="text-xs text-muted-foreground mb-1">{scale.name}</div>
                       <div className="text-lg font-bold mb-2">{isLeftDominant ? scale.leftLabel : scale.rightLabel}: {Math.round(Math.max(leftPct, rightPct))}%</div>
                       <div className="space-y-1 text-sm">
-                        <div className="flex items-center justify-between p-1.5 rounded hover:bg-muted/50 transition-colors">
+                        <div className="flex items-center justify-between p-1.5 rounded hover:bg-muted/50 transition-colors cursor-help relative group"
+                          onMouseEnter={() => setHoveredScale(leftKey)}
+                          onMouseLeave={() => setHoveredScale(null)}>
                           <span className="font-medium">{scale.leftLabel}</span>
                           <span>{Math.round(leftPct)}%</span>
+                          {hoveredScale === leftKey && (
+                            <div className="absolute z-50 bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 rounded-lg bg-popover text-popover-foreground text-xs shadow-lg border max-w-[220px] text-center pointer-events-none">
+                              <p className="font-medium">{scale.leftLabel}</p>
+                              <p className="text-muted-foreground">{scale.leftDesc}</p>
+                            </div>
+                          )}
                         </div>
-                        <div className="flex items-center justify-between p-1.5 rounded hover:bg-muted/50 transition-colors">
+                        <div className="flex items-center justify-between p-1.5 rounded hover:bg-muted/50 transition-colors cursor-help relative group"
+                          onMouseEnter={() => setHoveredScale(rightKey)}
+                          onMouseLeave={() => setHoveredScale(null)}>
                           <span className="font-medium">{scale.rightLabel}</span>
                           <span>{Math.round(rightPct)}%</span>
+                          {hoveredScale === rightKey && (
+                            <div className="absolute z-50 bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 rounded-lg bg-popover text-popover-foreground text-xs shadow-lg border max-w-[220px] text-center pointer-events-none">
+                              <p className="font-medium">{scale.rightLabel}</p>
+                              <p className="text-muted-foreground">{scale.rightDesc}</p>
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -378,12 +397,10 @@ export default function ProfilePage() {
             </div>
           </div>
         ) : (
-          <div className="p-6 rounded-xl border bg-card">
-            <div className="flex items-center gap-2 mb-2">
-              <Eye className="h-5 w-5 text-emerald-500" />
-              <h2 className="text-xl font-semibold">Визуальный тест личности</h2>
-            </div>
-            <p className="text-sm text-muted-foreground mb-4">80 вопросов с фигурами по 10 шкалам личности.</p>
+          <div className="text-center p-6 rounded-xl border bg-card">
+            <Eye className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+            <h2 className="text-xl font-semibold mb-2">Нет результатов визуального теста</h2>
+            <p className="text-muted-foreground mb-4">Пройдите визуальный тест, чтобы узнать свой многомерный профиль личности по 10 шкалам</p>
             <Button variant="outline" size="sm" onClick={() => router.push("/test/visual")}>Пройти тест</Button>
           </div>
         )}
