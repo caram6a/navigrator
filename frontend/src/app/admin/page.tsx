@@ -148,23 +148,35 @@ export default function AdminPage() {
     };
   }, [router]);
 
-  const toggleVerify = (userId: string) => {
-    const all = JSON.parse(localStorage.getItem("users") || "[]");
-    const idx = all.findIndex((u: any) => u.id === userId);
-    if (idx !== -1) {
-      all[idx].is_verified = !all[idx].is_verified;
-      localStorage.setItem("users", JSON.stringify(all));
-      setUserList([...all]);
+  const toggleVerify = async (userId: string) => {
+    try {
+      await usersApi.verify(userId);
+      setUserList(prev => prev.map(u => u.id === userId ? { ...u, isVerified: true } : u));
+    } catch {
+      // fallback на localStorage
+      const all = JSON.parse(localStorage.getItem("users") || "[]");
+      const idx = all.findIndex((u: any) => u.id === userId);
+      if (idx !== -1) {
+        all[idx].is_verified = !all[idx].is_verified;
+        localStorage.setItem("users", JSON.stringify(all));
+        setUserList([...all]);
+      }
     }
   };
 
-  const changeRole = (userId: string, newRole: string) => {
-    const all = JSON.parse(localStorage.getItem("users") || "[]");
-    const idx = all.findIndex((u: any) => u.id === userId);
-    if (idx !== -1) {
-      all[idx].role = newRole;
-      localStorage.setItem("users", JSON.stringify(all));
-      setUserList([...all]);
+  const changeRole = async (userId: string, newRole: string) => {
+    try {
+      await usersApi.updateRole(userId, newRole);
+      setUserList(prev => prev.map(u => u.id === userId ? { ...u, role: newRole } : u));
+    } catch {
+      // fallback на localStorage
+      const all = JSON.parse(localStorage.getItem("users") || "[]");
+      const idx = all.findIndex((u: any) => u.id === userId);
+      if (idx !== -1) {
+        all[idx].role = newRole;
+        localStorage.setItem("users", JSON.stringify(all));
+        setUserList([...all]);
+      }
     }
   };
 
