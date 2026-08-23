@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Shield, Users as UsersIcon, BookOpen, Swords, CheckCircle, XCircle, Loader2, Plus, Trash2, Edit3, Save, StickyNote, User } from "lucide-react";
 
-type Tab = "helpers" | "players" | "competencies" | "games" | "notes";
+type Tab = "helpers" | "players" | "all" | "competencies" | "games" | "notes";
 
 interface Competency {
   id: number;
@@ -70,6 +70,7 @@ export default function AdminPage() {
     id: 0, title: "", description: "", complexity: "Средняя", competencies: []
   });
   const [noteText, setNoteText] = useState("");
+  const [allUsersExpanded, setAllUsersExpanded] = useState(false);
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -121,7 +122,23 @@ export default function AdminPage() {
     setGames(adminGames);
     setNotes(getAdminNotes());
 
+    // Синхронизация заметок между вкладками
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === "adminNotes") {
+        setNotes(JSON.parse(e.newValue || "[]"));
+      }
+    };
+    window.addEventListener("storage", handleStorage);
+    // Периодическая проверка (для синхронизации между разными браузерами — заглушка)
+    const interval = setInterval(() => {
+      setNotes(getAdminNotes());
+    }, 5000);
+
     setLoading(false);
+    return () => {
+      window.removeEventListener("storage", handleStorage);
+      clearInterval(interval);
+    };
   }, [router]);
 
   const toggleVerify = (userId: string) => {
@@ -263,6 +280,7 @@ export default function AdminPage() {
   const tabs: { key: Tab; label: string; icon: any }[] = [
     { key: "helpers", label: "Помощники", icon: UsersIcon },
     { key: "players", label: "Игроки", icon: User },
+    { key: "all", label: "Все пользователи", icon: UsersIcon },
     { key: "competencies", label: "Компетенции", icon: BookOpen },
     { key: "games", label: "Игры", icon: Swords },
     { key: "notes", label: "Заметки", icon: StickyNote },
@@ -270,6 +288,8 @@ export default function AdminPage() {
 
   const helpers = userList.filter((u: any) => u.role === "helper");
   const players = userList.filter((u: any) => u.role === "player");
+  const adminsAndLeaders = userList.filter((u: any) => u.role === "admin" || u.role === "leader");
+  const allUsers = userList;
 
   const formatDate = (d: string) => {
     return new Date(d).toLocaleDateString("ru-RU", {
@@ -387,7 +407,7 @@ export default function AdminPage() {
 
         {tab === "players" && (
           <div className="space-y-4">
-            <h2 className="text-xl font-semibold mb-4">Игроки</h2>
+            <h2 className="text-xl font-semibold mb-4">Игроки ({players.length})</h2>
             {players.length === 0 ? (
               <p className="text-muted-foreground">Нет игроков</p>
             ) : (
@@ -401,6 +421,72 @@ export default function AdminPage() {
                         <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary">
                           Игрок
                         </span>
+                        {u.mbti_type && (
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300">
+                            {u.mbti_type}
+                          </span>
+                        )}
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
+                          {formatDate(u.created_at)}
+                        </span>
+                      </div>
+                    </div>
+                    <select
+                      value={u.role}
+                      onChange={(e) => changeRole(u.id, e.target.value)}
+                      className="text-sm px-2 py-1 rounded border bg-background"
+                    >
+                      <option value="player">Игрок</option>
+                      <option value="helper">Помощник</option>
+                      <option value="leader">Лидер</option>
+                      <option value="admin">Админ</option>
+                    </select>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {tab === "all" && (
+          <div className="space-y-4">
+            <h2 className="text-xl font-semibold mb-4">
+              Все пользователи ({allUsers.length})
+              <span className="text-sm font-normal text-muted-foreground ml-2">
+                ({adminsAndLeaders.length} админов/лидеров, {helpers.length} помощников, {players.length} игроков)
+              </span>
+            </h2>
+            {allUsers.length === 0 ? (
+              <p className="text-muted-foreground">Нет пользователей</p>
+            ) : (
+              <div className="space-y-3">
+                {allUsers.sort((a: any, b: any) => {
+                  const roleOrder: Record<string, number> = { admin: 0, leader: 1, helper: 2, player: 3 };
+                  return (roleOrder[a.role] ?? 99) - (roleOrder[b.role] ?? 99);
+                }).map((u: any) => (
+                  <div key={u.id} className="p-4 rounded-xl border bg-card flex items-center justify-between">
+                    <div>
+                      <p className="font-medium">{u.name}</p>
+                      <p className="text-sm text-muted-foreground">{u.email}</p>
+                      <div className="flex gap-2 mt-1 flex-wrap">
+                        <span className={"text-xs px-2 py-0.5 rounded-full " + (
+                          u.role === "admin" ? "bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300" :
+                          u.role === "leader" ? "bg-orange-100 dark:bg-orange-900 text-orange-700 dark:text-orange-300" :
+                          u.role === "helper" ? "bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300" :
+                          "bg-primary/10 text-primary"
+                        )}>
+                          {roleLabels[u.role] || u.role}
+                        </span>
+                        {u.is_verified && u.role === "helper" && (
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300">
+                            Одобрен
+                          </span>
+                        )}
+                        {!u.is_verified && u.role === "helper" && (
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-yellow-100 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-300">
+                            На проверке
+                          </span>
+                        )}
                         {u.mbti_type && (
                           <span className="text-xs px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300">
                             {u.mbti_type}
@@ -566,7 +652,12 @@ export default function AdminPage() {
 
         {tab === "notes" && (
           <div className="space-y-4">
-            <h2 className="text-xl font-semibold mb-4">Заметки администраторов</h2>
+            <h2 className="text-xl font-semibold mb-4">
+              Заметки администраторов
+              <span className="text-sm font-normal text-muted-foreground ml-2">
+                (видны всем админам, автообновление каждые 5 сек)
+              </span>
+            </h2>
 
             <div className="flex gap-2">
               <textarea
