@@ -9,3 +9,4 @@ ngrok3/
 tunnel/
 public/
 .vercel
+.env*

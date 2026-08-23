@@ -1,4 +1,4 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://backend-production-05967.up.railway.app";
+const API_URL = (process.env.NEXT_PUBLIC_API_URL || "https://backend-production-05967.up.railway.app").trim();
 
 interface ApiOptions {
   method?: string;
@@ -28,15 +28,24 @@ async function request<T>(endpoint: string, options: ApiOptions = {}): Promise<T
     headers["Authorization"] = `Bearer ${token}`;
   }
 
-  const response = await fetch(`${API_URL}${endpoint}`, {
-    method: options.method || "GET",
-    headers,
-    body: options.body ? JSON.stringify(options.body) : undefined,
-  });
+  const url = `${API_URL}${endpoint}`;
+  console.log(`[API] ${options.method || "GET"} ${url}`);
+
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method: options.method || "GET",
+      headers,
+      body: options.body ? JSON.stringify(options.body) : undefined,
+    });
+  } catch (fetchError: any) {
+    console.error("[API] Fetch failed:", fetchError);
+    throw new ApiError(`Сетевая ошибка: ${fetchError.message || "не удалось соединиться с сервером"}`, 0);
+  }
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ error: "Ошибка сети" }));
-    throw new ApiError(error.error || "Ошибка сети", response.status);
+    const error = await response.json().catch(() => ({ error: `HTTP ${response.status}` }));
+    throw new ApiError(error.error || `HTTP ${response.status}`, response.status);
   }
 
   return response.json();
