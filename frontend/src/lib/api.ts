@@ -1,5 +1,5 @@
 // API проксируется через Vercel (rewrites) — телефону не нужно обращаться напрямую к Railway, который может быть заблокирован операторами
-const API_URL = "/api/backend";
+const API_URL = "/api/backend";  // Прокси через Vercel
 
 interface ApiOptions {
   method?: string;
