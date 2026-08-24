@@ -1,5 +1,5 @@
-// Жёстко закодированный URL бэкенда — не зависит от Vercel env
-const API_URL = "https://backend-production-05967.up.railway.app";
+// API проксируется через Vercel (rewrites) — телефону не нужно обращаться напрямую к Railway, который может быть заблокирован операторами
+const API_URL = "/api/backend";
 
 interface ApiOptions {
   method?: string;
@@ -55,27 +55,27 @@ async function request<T>(endpoint: string, options: ApiOptions = {}): Promise<T
 // Auth
 export const auth = {
   register: (data: { name: string; email: string; password: string; role?: string }) =>
-    request<{ user: any; token: string }>("/api/auth/register", {
+    request<{ user: any; token: string }>("/auth/register", {
       method: "POST",
       body: data,
     }),
   login: (data: { email: string; password: string }) =>
-    request<{ user: any; token: string }>("/api/auth/login", {
+    request<{ user: any; token: string }>("/auth/login", {
       method: "POST",
       body: data,
     }),
-  me: () => request<{ user: any }>("/api/auth/me"),
+  me: () => request<{ user: any }>("/auth/me"),
 };
 
 // Users
 export const users = {
-  list: () => request<{ users: any[] }>("/api/users"),
-  helpers: () => request<{ helpers: any[] }>("/api/users/helpers"),
-  getById: (id: string) => request<{ user: any }>(`/api/users/${id}`),
+  list: () => request<{ users: any[] }>("/users"),
+  helpers: () => request<{ helpers: any[] }>("/users/helpers"),
+  getById: (id: string) => request<{ user: any }>(`/users/${id}`),
   verify: (id: string) =>
-    request<{ user: any }>(`/api/users/${id}/verify`, { method: "PUT" }),
+    request<{ user: any }>(`/users/${id}/verify`, { method: "PUT" }),
   updateRole: (id: string, role: string) =>
-    request<{ user: any }>(`/api/users/${id}/role`, {
+    request<{ user: any }>(`/users/${id}/role`, {
       method: "PUT",
       body: { role },
     }),
@@ -83,53 +83,53 @@ export const users = {
 
 // Competencies
 export const competencies = {
-  list: () => request<{ competencies: any[] }>("/api/competencies"),
+  list: () => request<{ competencies: any[] }>("/competencies"),
   create: (data: { name: string; description: string }) =>
-    request<{ competency: any }>("/api/competencies", {
+    request<{ competency: any }>("/competencies", {
       method: "POST",
       body: data,
     }),
   update: (id: string, data: { name: string; description: string }) =>
-    request<{ competency: any }>(`/api/competencies/${id}`, {
+    request<{ competency: any }>(`/competencies/${id}`, {
       method: "PUT",
       body: data,
     }),
   delete: (id: string) =>
-    request<{ message: string }>(`/api/competencies/${id}`, { method: "DELETE" }),
+    request<{ message: string }>(`/competencies/${id}`, { method: "DELETE" }),
 };
 
 // Games
 export const games = {
-  list: () => request<{ games: any[] }>("/api/games"),
-  getById: (id: string) => request<{ game: any }>(`/api/games/${id}`),
+  list: () => request<{ games: any[] }>("/games"),
+  getById: (id: string) => request<{ game: any }>(`/games/${id}`),
   create: (data: any) =>
-    request<{ game: any }>("/api/games", { method: "POST", body: data }),
+    request<{ game: any }>("/games", { method: "POST", body: data }),
   update: (id: string, data: any) =>
-    request<{ game: any }>(`/api/games/${id}`, { method: "PUT", body: data }),
+    request<{ game: any }>(`/games/${id}`, { method: "PUT", body: data }),
   delete: (id: string) =>
-    request<{ message: string }>(`/api/games/${id}`, { method: "DELETE" }),
+    request<{ message: string }>(`/games/${id}`, { method: "DELETE" }),
 };
 
 // Sessions
 export const sessions = {
   create: (data: { helperId: string; gameId: string }) =>
-    request<{ session: any }>("/api/sessions", {
+    request<{ session: any }>("/sessions", {
       method: "POST",
       body: data,
     }),
   complete: (id: string) =>
-    request<{ session: any }>(`/api/sessions/${id}/complete`, { method: "PUT" }),
-  my: () => request<{ sessions: any[] }>("/api/sessions/my"),
-  all: () => request<{ sessions: any[] }>("/api/sessions"),
+    request<{ session: any }>(`/sessions/${id}/complete`, { method: "PUT" }),
+  my: () => request<{ sessions: any[] }>("/sessions/my"),
+  all: () => request<{ sessions: any[] }>("/sessions"),
 };
 
 // Notes
 export const notes = {
-  list: () => request<{ notes: any[] }>("/api/notes"),
+  list: () => request<{ notes: any[] }>("/notes"),
   create: (data: { text: string }) =>
-    request<{ note: any }>("/api/notes", { method: "POST", body: data }),
+    request<{ note: any }>("/notes", { method: "POST", body: data }),
   delete: (id: string) =>
-    request<{ message: string }>(`/api/notes/${id}`, { method: "DELETE" }),
+    request<{ message: string }>(`/notes/${id}`, { method: "DELETE" }),
 };
 
 // Sync utils
@@ -149,13 +149,13 @@ export async function syncLocalToApi<T>(endpoint: string, localKey: string, mapp
 
 // Test
 export const testApi = {
-  questions: () => request<{ questions: any[]; dimensions: string[] }>("/api/test/questions"),
+  questions: () => request<{ questions: any[]; dimensions: string[] }>("/test/questions"),
   submit: (answers: { questionId: number; value: number }[]) =>
     request<{
       mbtiType: string;
       dimensions: any;
       description: { title: string; description: string; strengths: string[]; growth: string[] };
-    }>("/api/test/submit", {
+    }>("/test/submit", {
       method: "POST",
       body: { answers },
     }),
@@ -163,12 +163,12 @@ export const testApi = {
     request<{
       mbtiType: string;
       description: { title: string; description: string; strengths: string[]; growth: string[] };
-    }>("/api/test/result"),
+    }>("/test/result"),
   saveResult: (testType: "mbti" | "visual", result: any) =>
-    request<{ testResult: any }>("/api/test/save", {
+    request<{ testResult: any }>("/test/save", {
       method: "POST",
       body: { testType, result },
     }),
-  getResults: () => request<{ results: any[] }>("/api/test/results"),
-  getResultsByType: (type: "mbti" | "visual") => request<{ results: any[] }>(`/api/test/results/${type}`),
+  getResults: () => request<{ results: any[] }>("/test/results"),
+  getResultsByType: (type: "mbti" | "visual") => request<{ results: any[] }>(`/test/results/${type}`),
 };
